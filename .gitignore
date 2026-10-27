@@ -1,0 +1,24 @@
+# Game data is copyrighted: never commit it.
+*.bin
+*.cue
+*.iso
+*.img
+*.ccd
+*.sub
+*.mds
+*.mdf
+*.exe
+*.EXE
+*.dll
+*.DLL
+*.wav
+*.WAV
+*.bmp
+*.BMP
+*.ini
+*.INI
+# local work folders (game files, disassembly, test output)
+/work/
+/MagicalChase/
+__pycache__/
+*.pyc
