@@ -1,0 +1,54 @@
+# Builds the single-file installers, with Python and tkinter bundled so users
+# need nothing else:
+#   RipplesPotion.exe              Windows
+#   RipplesPotion-linux-x86_64     Linux (built on Ubuntu 22.04, so it runs on
+#                                  distros with glibc 2.35 or newer)
+# Runs on every published release, attaching both files to it, and on demand
+# from the Actions tab.
+name: Builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            file: RipplesPotion.exe
+            flags: --windowed
+          - os: ubuntu-22.04
+            file: RipplesPotion-linux-x86_64
+            flags: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        shell: bash
+        run: |
+          python -c "import tkinter; print('tk', tkinter.TkVersion)"
+          pip install pyinstaller==6.11.1
+          pyinstaller --onefile ${{ matrix.flags }} --name "${{ matrix.file }}" --paths patcher patcher/gui.py
+          ls -l dist
+      - name: Smoke test
+        if: runner.os == 'Linux'
+        run: dist/${{ matrix.file }} --help | head -3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}
+          path: dist/${{ matrix.file }}
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "dist/${{ matrix.file }}" --clobber

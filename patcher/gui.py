@@ -3,11 +3,16 @@
 Ripple's Potion - graphical installer for Magical Chase (Windows 95).
 
     python3 gui.py [source]
+    python3 gui.py --ask [source]                       text questions
+    python3 gui.py <source> <output folder> [options]   command line
+
+The last two forms are the same as install_magical_chase.py; they make the
+single-file builds (RipplesPotion.exe, RipplesPotion-linux-x86_64) all-in-one.
 
 Uses tkinter, which comes with Python on Windows. On Linux it may be a
 separate package (python3-tkinter on Fedora, python3-tk on Debian/Ubuntu).
-Exits with code 3 if tkinter is missing, so install.bat can fall back to its
-text questions.
+Exits with code 3 if tkinter is missing or there is no display, so the
+install scripts can fall back to the text questions.
 """
 import glob
 import os
@@ -115,8 +120,8 @@ class App:
                              'numpad 8/2/4/6)').grid(sticky='w')
         self.ddraw = tk.BooleanVar(value=True)
         ttk.Checkbutton(box, variable=self.ddraw,
-                        text='cnc-ddraw: scaled 4:3 fullscreen, Alt+Enter for a window '
-                             '(downloads 2.7 MB)').grid(sticky='w')
+                        text='cnc-ddraw: scaled fullscreen, Alt+Enter for a window '
+                             '(2.7 MB)').grid(sticky='w')
 
         # install + progress
         row = ttk.Frame(main)
@@ -228,6 +233,11 @@ class App:
 
 
 def main():
+    args = sys.argv[1:]
+    positional = [a for a in args if not a.startswith('--')]
+    has_console = sys.stdout is not None        # not the windowed Windows exe
+    if has_console and ('--ask' in args or len(positional) >= 2 or '--help' in args):
+        return inst.main()
     if os.name == 'nt':
         try:
             import ctypes
@@ -237,9 +247,13 @@ def main():
     try:
         root = tk.Tk()
     except tk.TclError as e:
+        if getattr(sys, 'frozen', False) and has_console and sys.stdin.isatty():
+            print('Cannot open a window (%s), so asking here instead.\n' % e)
+            sys.argv[1:] = ['--ask'] + positional
+            return inst.main()
         print('Cannot open a window (%s). Use the command line installer instead.' % e)
         sys.exit(3)
-    App(root, sys.argv[1] if len(sys.argv) > 1 else '')
+    App(root, positional[0] if positional else '')
     root.mainloop()
 
 
