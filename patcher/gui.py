@@ -59,7 +59,7 @@ class App:
         self.done_steps = 0
         root.title(TITLE + ' - Magical Chase installer')
         root.resizable(False, False)
-        main = ttk.Frame(root, padding=14)
+        main = ttk.Frame(root, padding=10)
         main.grid(sticky='nsew')
         main.columnconfigure(0, weight=1)
 
@@ -136,7 +136,7 @@ class App:
         self.go.grid(row=0, column=2, padx=(6, 0))
         self.status = ttk.Label(main, text='')
         self.status.grid(sticky='w')
-        self.log = tk.Text(main, height=4, width=70, state='disabled')
+        self.log = tk.Text(main, height=3, width=70, state='disabled')
         self.log.grid(sticky='ew', pady=(4, 0))
 
     # ---- pickers
@@ -253,6 +253,10 @@ def main():
             return inst.main()
         print('Cannot open a window (%s). Use the command line installer instead.' % e)
         sys.exit(3)
+    if os.name != 'nt':
+        style = ttk.Style(root)
+        style.theme_use('clam')                 # Tk's default Linux theme looks dated
+        style.configure('TLabelframe', labeloutside=False, labelmargins=(6, 0, 6, 0))
     App(root, positional[0] if positional else '')
     root.mainloop()
 

@@ -23,7 +23,12 @@ Windows 10/11 や Linux（Wine）で遊べるようにするパッチです。
 CDドライブまたは `.cue` / `.iso` ファイル、インストール先、オプションを選んで
 **Install** を押します。`.cue` ファイルを `install.bat` にドラッグ＆ドロップしてもOKです。
 
-**Linux**: `./install.sh` で同じ画面が開きます（tkinterが必要です。Fedora:
+**Linux（かんたん）**: [Releases](https://github.com/TremiRodomi/ripples-potion/releases)
+ページから `RipplesPotion-linux-x86_64` をダウンロードし、実行可能にして
+（`chmod +x RipplesPotion-linux-x86_64`）実行します。インストールには他に何も要りません
+（遊ぶにはWineが必要です。glibc 2.35以降のディストリビューションに対応）。
+
+**Linux（ソースから）**: `./install.sh` で同じ画面が開きます（tkinterが必要です。Fedora:
 `sudo dnf install python3-tkinter`、Debian/Ubuntu: `sudo apt install python3-tk`）。
 tkinterや画面がない場合は、ターミナルで質問に答える形式になります。
 

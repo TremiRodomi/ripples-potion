@@ -24,10 +24,18 @@ below instead.)
 (tick *"Add python.exe to PATH"* during setup), then double-click
 `install.bat` for the same window. You can also drag a `.cue` file onto it.
 
-**Linux**: run `./install.sh` for the same window. It needs tkinter
-(`sudo dnf install python3-tkinter` on Fedora, `sudo apt install python3-tk`
-on Debian/Ubuntu). Without it, or without a display, the installer asks its
-questions in the terminal instead.
+**Linux**: download `RipplesPotion-linux-x86_64` from the
+[Releases](https://github.com/TremiRodomi/ripples-potion/releases) page, make
+it executable (right-click › Properties › *Allow executing as program*, or
+`chmod +x RipplesPotion-linux-x86_64`) and run it. Nothing else is needed to
+install; to play you need Wine. Without a display it asks its questions in
+the terminal instead, and it also takes the command-line options below. It
+needs glibc 2.35 or newer (most distros from 2022 on).
+
+**Linux, from the source**: run `./install.sh` for the same window. It needs
+tkinter (`sudo dnf install python3-tkinter` on Fedora,
+`sudo apt install python3-tk` on Debian/Ubuntu). Without it, or without a
+display, the installer asks its questions in the terminal instead.
 
 ### Music
 
@@ -153,8 +161,8 @@ Settings are stored in `MCHASE.INI` in the game folder, or in
 ## Files
 
 * `install.bat` / `install.sh` – installers for Windows / Linux
-* `.github/workflows/windows-exe.yml` – builds `RipplesPotion.exe` with
-  PyInstaller for each release
+* `.github/workflows/builds.yml` – builds `RipplesPotion.exe` and
+  `RipplesPotion-linux-x86_64` with PyInstaller for each release
 * `patcher/gui.py` – the installer window
 * `patcher/install_magical_chase.py` – installer (image or disc → folder)
 * `patcher/patch_mchase.py` – the EXE patcher
