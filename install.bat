@@ -1,7 +1,7 @@
 @echo off
-rem Magical Chase installer for Windows.
-rem   install.bat                         asks for the source and the folder
-rem   install.bat D: C:\Games\MagicalChase [--japanese] [--portable] ...
+rem Ripple's Potion - Magical Chase installer for Windows.
+rem   install.bat                          opens the installer window
+rem   install.bat D: C:\Games\MagicalChase [--japanese] [--registry] [--disc-wav] [--numpad]
 rem You can also drag a .cue file (or the disc drive) onto this file.
 setlocal
 set "HERE=%~dp0"
@@ -16,21 +16,11 @@ if not defined PY (
 )
 if not "%~2"=="" (
   %PY% "%HERE%patcher\install_magical_chase.py" %*
-  goto done
+  pause
+  exit /b
 )
-set "SRC=%~1"
-if "%SRC%"=="" set /p "SRC=Disc drive (e.g. D:) or .cue / .iso file: "
-set "OUT="
-set /p "OUT=Install folder [%USERPROFILE%\Games\MagicalChase]: "
-if "%OUT%"=="" set "OUT=%USERPROFILE%\Games\MagicalChase"
-set "OPTS="
-set "ANS="
-set /p "ANS=Keep the original Japanese menus? (y/N): "
-if /i "%ANS%"=="y" set "OPTS=%OPTS% --japanese"
-set "ANS="
-set /p "ANS=Save settings in the game folder (portable)? (y/N): "
-if /i "%ANS%"=="y" set "OPTS=%OPTS% --portable"
-%PY% "%HERE%patcher\install_magical_chase.py" "%SRC%" "%OUT%" %OPTS%
-if not errorlevel 1 echo. & echo Start the game with "%OUT%\Mchase.exe"
-:done
+rem graphical installer; exit code 3 means tkinter is missing: ask in text
+%PY% "%HERE%patcher\gui.py" %1
+if not errorlevel 3 exit /b
+%PY% "%HERE%patcher\install_magical_chase.py" --ask %1
 pause

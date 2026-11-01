@@ -8,8 +8,9 @@ Usage:  python3 patch_mchase.py [options] <original Mchase.exe> <output Mchase.e
                  compatibility fixes are applied
     --numpad     keep the original default keys (numpad 8/2/4/6) instead of
                  the arrow keys
-    --portable   store settings in MCHASE.INI next to the EXE instead of the
-                 registry (HKCU\\Software\\QUEST\\MagicChase\\1.0)
+    --registry   store settings in the registry
+                 (HKCU\\Software\\QUEST\\MagicChase\\1.0) like the original,
+                 instead of MCHASE.INI next to the EXE (the default)
 
 What it changes (the original file is never modified):
   * No CD / AUTORUN.EXE needed: if the "?GOPA242" launch token is missing the
@@ -19,7 +20,8 @@ What it changes (the original file is never modified):
     game starts fullscreen and Alt+Enter is ignored. Fullscreen uses 16-bit
     HiColor by default (8-bit if the VideoMode registry value is 8) instead
     of copying the 32-bit desktop depth.
-  * Sound page (CD Audio / WAV choice, music & SE test) always present in
+  * Music always plays from the WAV files in mus\\. The useless CD Audio / WAV
+    choice is hidden; the Sound page (music & SE test) is always present in
     Settings > Options, not only in AUTORUN's settings mode.
   * Joystick divide-by-zero crash fix (same bytes as the official mc_patch.exe).
   * Default movement keys are the arrow keys instead of numpad 8/2/4/6
@@ -27,7 +29,7 @@ What it changes (the original file is never modified):
   * Menus, settings dialogs, messages, joystick axis names and BGM track names
     translated to English (both the 0x409 and 0x411 resource languages).
     Skipped with --japanese.
-  * Optional (--portable): settings saved in MCHASE.INI next to the EXE.
+  * Settings saved in MCHASE.INI next to the EXE (portable), unless --registry.
 
 Only the Python 3 standard library is needed.
 """
@@ -107,6 +109,9 @@ CODE_PATCHES = [
     # Options sheet: always include the Sound page (originally only when
     # AUTORUN started the game in its "settings" mode with the S argument)
     (0x427D9C, '750f', 'eb0f'),
+    # Loading the "Sound" setting: test eax,eax; setne dl -> mov dl,1, so the
+    # music is always WAV (1). CD Audio mode would be silent without the disc.
+    (0x427773, '85c00f95c2', 'b201909090'),
 ]
 
 
@@ -192,7 +197,7 @@ STRINGS = {
     8: 'Direction %u',
     9: 'Button %u',
     10: 'Not connected',
-    11: 'Could not save settings to the registry.',
+    11: 'Could not save the settings.',
     12: 'Display',
     13: 'SE %u',
     50018: "EXE file damaged. Can't load resource.",
@@ -323,9 +328,11 @@ def parse_dialog(b):
     menu, o = sz_or_ord(b, o)
     cls, o = sz_or_ord(b, o)
     title, o = u16z(b, o)
+    font = None
     if style & 0x40:
-        o += 2
-        _, o = u16z(b, o)
+        size = struct.unpack_from('<H', b, o)[0]
+        face, o = u16z(b, o + 2)
+        font = (size, face)
     items = []
     for _ in range(n):
         o = (o + 3) & ~3
@@ -338,19 +345,20 @@ def parse_dialog(b):
         o += 2 + el
         items.append([st, exs, ix, iy, icx, icy, iid, c, t, extra])
     return dict(style=style, ex=ex, rect=[x, y, cx, cy], menu=menu, cls=cls,
-                title=title, items=items)
+                title=title, font=font, items=items)
 
 
-def build_dialog(dlg):
+def build_dialog(dlg, english=True):
+    font = FONT if english or not dlg['font'] else dlg['font']
     out = bytearray(struct.pack('<IIH', dlg['style'] | 0x40, dlg['ex'], len(dlg['items'])))
     out += struct.pack('<hhhh', *dlg['rect'])
     out += w_sz_or_ord(dlg['menu']) + w_sz_or_ord(dlg['cls'])
     out += dlg['title'].encode('utf-16le') + b'\0\0'
-    out += struct.pack('<H', FONT[0]) + FONT[1].encode('utf-16le') + b'\0\0'
+    out += struct.pack('<H', font[0]) + font[1].encode('utf-16le') + b'\0\0'
     for st, exs, x, y, cx, cy, iid, c, t, extra in dlg['items']:
         while len(out) % 4:
             out += b'\0'
-        if isinstance(t, str):
+        if english and isinstance(t, str):
             t = DIALOG_TEXT.get(t, t)
         out += struct.pack('<IIhhhhH', st, exs, x, y, cx, cy, iid)
         out += w_sz_or_ord(c) + w_sz_or_ord(t)
@@ -358,8 +366,32 @@ def build_dialog(dlg):
     return bytes(out)
 
 
+SOUND_PAGE, RADIO_CDDA, RADIO_WAV, MUSIC_LIST = 109, 1005, 1006, 1007
+
+
+def hide_music_choice(dlg):
+    """Sound page: hide the CD Audio / WAV radio buttons (the game still reads
+    the hidden WAV button, which stays checked) and close the gap they leave."""
+    it = dlg['items']
+    radios = [i for i in it if i[6] in (RADIO_CDDA, RADIO_WAV)]
+    top = min(i[3] for i in radios)
+    dy = next(i[3] for i in it if i[6] == MUSIC_LIST) - top
+    for i in radios:
+        i[0] &= ~0x10010000                      # not WS_VISIBLE / WS_TABSTOP
+    for i in it:
+        if i in radios:
+            continue
+        if i[3] > top:
+            i[3] -= dy
+        elif i[3] + i[5] > top:                  # the "Music" group box
+            i[5] -= dy
+    dlg['rect'][3] -= dy
+
+
 def adjust_dialog(name, dlg):
     it = dlg['items']
+    if name == SOUND_PAGE:
+        hide_music_choice(dlg)
     if name == 101:  # keyboard page: wider labels for "Option control"
         for i in it:
             if i[7] == 0x82 and i[6] == 0xFFFF:
@@ -393,11 +425,12 @@ def parse_string_block(b):
     return res
 
 # ----------------------------------------------------------------------------
-def patch(src, japanese=False, arrow_keys=True, portable=False):
+def patch(src, japanese=False, arrow_keys=True, portable=True):
     """Return the patched EXE.
     japanese:   keep the original Japanese text
     arrow_keys: default movement keys are the arrow keys (not numpad 8/2/4/6)
-    portable:   settings go to MCHASE.INI next to the EXE, not the registry"""
+    portable:   settings go to MCHASE.INI next to the EXE, not the registry
+                (False = registry, like the original game)"""
     pe = PE(src)
     code = list(CODE_PATCHES)
     if arrow_keys:
@@ -433,28 +466,37 @@ def patch(src, japanese=False, arrow_keys=True, portable=False):
     for i, entry in enumerate(PORT_ENTRIES):
         struct.pack_into('<I', sec, PTR_TABLE_OFF + 4 * i, SEC_VA + PORT_OFF + entry)
 
-    # 4. resources: collect the Japanese (0x411) originals, build English blobs
+    # 4. resources. English: every menu, dialog and string table is rebuilt
+    # from the Japanese (0x411) original and used for both languages.
+    # Japanese: only the Sound page is rebuilt, per language, keeping its text.
     res = {}
     for t, n, lang, entry in walk_resources(pe):
         if t in (4, 5, 6):
             rva, size = struct.unpack_from('<II', pe.d, entry)
             res[(t, n, lang)] = (entry, bytes(pe.d[pe.off(rva):pe.off(rva) + size]))
-    if japanese:
-        res = {}
     blobs = {}
-    for (t, n, lang), (entry, data) in res.items():
-        if lang != 0x411:
-            continue
-        if t == 4:
-            blobs[(t, n)] = build_menu(parse_menu(data))
-        elif t == 5:
-            dlg = parse_dialog(data)
-            adjust_dialog(n, dlg)
-            blobs[(t, n)] = build_dialog(dlg)
-        elif t == 6:
-            blobs[(t, n)] = build_string_block(n, parse_string_block(data))
-    for (t, n, lang), (entry, _) in res.items():
-        blob = blobs[(t, n)]
+    if japanese:
+        for (t, n, lang), (entry, data) in res.items():
+            if t == 5 and n == SOUND_PAGE:
+                dlg = parse_dialog(data)
+                hide_music_choice(dlg)
+                blobs[entry] = build_dialog(dlg, english=False)
+    else:
+        english = {}
+        for (t, n, lang), (entry, data) in res.items():
+            if lang != 0x411:
+                continue
+            if t == 4:
+                english[(t, n)] = build_menu(parse_menu(data))
+            elif t == 5:
+                dlg = parse_dialog(data)
+                adjust_dialog(n, dlg)
+                english[(t, n)] = build_dialog(dlg)
+            elif t == 6:
+                english[(t, n)] = build_string_block(n, parse_string_block(data))
+        for (t, n, lang), (entry, _) in res.items():
+            blobs[entry] = english[(t, n)]
+    for entry, blob in blobs.items():
         while len(sec) % 16:
             sec.append(0)
         rva = SEC_VA - IMAGE_BASE + len(sec)
@@ -487,7 +529,7 @@ def patch(src, japanese=False, arrow_keys=True, portable=False):
 def main():
     flags = {a for a in sys.argv[1:] if a.startswith('--')}
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    unknown = flags - {'--japanese', '--numpad', '--portable'}
+    unknown = flags - {'--japanese', '--numpad', '--registry', '--portable'}
     if len(args) != 2 or unknown:
         print(__doc__)
         sys.exit(1)
@@ -498,7 +540,7 @@ def main():
         sys.exit('Unrecognised Mchase.exe (sha256 %s). Use the unmodified file from '
                  'RUN\\MCHASE\\SRC on the CD.' % h)
     out = patch(data, japanese='--japanese' in flags, arrow_keys='--numpad' not in flags,
-                portable='--portable' in flags)
+                portable='--registry' not in flags)
     with open(args[1], 'wb') as f:
         f.write(out)
     print('Patched %s -> %s' % (args[0], args[1]))

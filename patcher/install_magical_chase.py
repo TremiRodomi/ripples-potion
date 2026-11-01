@@ -5,6 +5,8 @@ AUTORUN.EXE, no InstallShield - and apply patch_mchase.py.
 
 Usage:
     python3 install_magical_chase.py <source> <output folder> [options]
+    python3 install_magical_chase.py --ask [source]     asks the questions
+    python3 gui.py [source]                             graphical installer
 
 <source> can be any of:
     MagicalChase.cue        a BIN/CUE image (single or one-file-per-track)
@@ -14,29 +16,40 @@ Usage:
     MagicalChase.iso        data-only image (no CD audio, so disc WAVs are used)
 
     --disc-wav   use the 22 kHz 8-bit MUS\\*.WAV files from the disc instead of
-                 the 44.1 kHz CD audio tracks (smaller, lower quality, faster)
+                 the 44.1 kHz CD audio tracks (smaller, lower quality, faster;
+                 also handy for a scratched disc). Without it, any CD audio
+                 track that can't be read falls back to its disc WAV anyway.
     --japanese   keep the original Japanese menus and dialogs (only the
                  compatibility fixes are applied)
     --numpad     keep the original default keys (numpad 8/2/4/6) instead of
                  the arrow keys
-    --portable   save settings in MCHASE.INI in the game folder instead of the
-                 Windows registry (so the folder can be moved or copied)
+    --no-ddraw   don't download cnc-ddraw (by default it is downloaded from
+                 its GitHub release and set up for scaled 4:3 fullscreen;
+                 Alt+Enter switches to a window)
+    --registry   save settings in the Windows registry like the original game,
+                 instead of MCHASE.INI in the game folder (the default, which
+                 lets the folder be moved or copied)
 
 Result:
     <output>/Mchase.exe         patched game
     <output>/mus/TR01-19.WAV    music (CD quality by default)
     <output>/STAFF.EXE + BMPs   staff-credits viewer from the disc
     <output>/magical-chase.sh   Linux/Wine launcher
+    <output>/ddraw.dll, ddraw.ini, Shaders/, cnc-ddraw config.exe   (cnc-ddraw)
 
 Only the Python 3 standard library is needed.
 """
 import ctypes
 import hashlib
+import io
 import os
 import re
 import struct
 import sys
+import textwrap
+import urllib.request
 import wave
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import patch_mchase  # noqa: E402
@@ -339,6 +352,77 @@ def open_source(src):
 
 
 # --------------------------------------------------------------------------
+# cnc-ddraw (MIT licence, https://github.com/FunkyFr3sh/cnc-ddraw): a DirectDraw
+# replacement that scales the 640x480 game to any window or screen size.
+# A fixed release is downloaded and checked, so nothing unexpected is installed.
+DDRAW_URL = ('https://github.com/FunkyFr3sh/cnc-ddraw/releases/download/'
+             'v7.1.0.0/cnc-ddraw.zip')
+DDRAW_SHA256 = '0b13ab89a64c9918189b1dadd449ef6ed3cb3b7b19cabd96d8adbd95505bb908'
+# Scaled borderless fullscreen keeping 4:3 (fits any screen); Alt+Enter
+# switches to a resizable window.
+DDRAW_SETTINGS = dict(fullscreen='true', windowed='true', maintas='true',
+                      aspect_ratio='4:3')
+
+
+def add_cnc_ddraw(out, log):
+    """Download cnc-ddraw into <out>. An existing ddraw.ini is kept. Failure
+    is only a warning: the game runs without it."""
+    try:
+        with urllib.request.urlopen(DDRAW_URL, timeout=60) as r:
+            blob = r.read()
+        if hashlib.sha256(blob).hexdigest() != DDRAW_SHA256:
+            raise ValueError('the download does not match the expected file')
+        z = zipfile.ZipFile(io.BytesIO(blob))
+    except (OSError, ValueError, zipfile.BadZipFile) as e:
+        log('cnc-ddraw not installed (%s). The game still works; see the README to '
+            'add it by hand.' % e)
+        return
+    keep_ini = os.path.exists(os.path.join(out, 'ddraw.ini'))
+    for info in z.infolist():
+        parts = info.filename.replace('\\', '/').split('/')
+        if info.is_dir() or '..' in parts or info.filename.startswith('/'):
+            continue
+        if parts == ['ddraw.ini'] and keep_ini:
+            continue
+        dst = os.path.join(out, *parts)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        data = z.read(info)
+        if parts == ['ddraw.ini']:
+            data = ddraw_ini(data)
+        open(dst, 'wb').write(data)
+    log('   cnc-ddraw (scaled fullscreen, Alt+Enter for a window)' +
+        ('; kept your ddraw.ini' if keep_ini else ''))
+
+
+def ddraw_ini(data):
+    """Apply DDRAW_SETTINGS to the global [ddraw] section of ddraw.ini."""
+    text = data.decode('latin-1')
+    m = re.search(r'^\[(?!ddraw\])', text, re.M)    # first game-specific section
+    head, rest = (text[:m.start()], text[m.start():]) if m else (text, '')
+    for key, value in DDRAW_SETTINGS.items():
+        head, n = re.subn(r'(?m)^%s=.*?(\r?)$' % key, r'%s=%s\1' % (key, value), head)
+        if not n:
+            head = head.replace('[ddraw]', '[ddraw]\r\n%s=%s' % (key, value), 1)
+    return (head + rest).encode('latin-1')
+
+
+# --------------------------------------------------------------------------
+# The music choice as the installers (GUI and install.bat) explain it.
+MUSIC_CHOICES = [
+    ('cd', 'CD audio (recommended)', [
+        '+ Best quality: 44.1 kHz 16-bit stereo',
+        '- Slower install: reads the whole soundtrack',
+        '- Takes more space: about 460 MB',
+        'A track that can\'t be read (scratched disc) uses its disc WAV '
+        'instead, so the install still finishes.',
+    ]),
+    ('wav', 'Disc WAV files', [
+        '+ Faster install, and smaller: about 115 MB',
+        '+ Good for a damaged disc or an ISO',
+        '- Lower quality: 22 kHz 8-bit',
+    ]),
+]
+
 LAUNCHER = r'''#!/bin/sh
 # Magical Chase launcher for Wine.
 #   ./magical-chase.sh               normal start (see below)
@@ -372,14 +456,11 @@ def wav_frames(disc_wav):
     return struct.unpack_from('<I', disc_wav, m + 4)[0] // (ch * bits // 8), rate
 
 
-def main():
-    flags = {a for a in sys.argv[1:] if a.startswith('--')}
-    args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    disc_wav = '--disc-wav' in flags
-    if len(args) != 2 or flags - {'--disc-wav', '--japanese', '--numpad', '--portable'}:
-        print(__doc__)
-        sys.exit(1)
-    src, out = args
+def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
+            portable=True, ddraw=True, log=print, progress=None):
+    """Copy, patch and rip everything into <out>. log(text) reports each
+    step; progress(text) (optional) reports a step still running."""
+    progress = progress or (lambda text: print('\r' + text.ljust(70), end='', flush=True))
     source = open_source(src)
     os.makedirs(os.path.join(out, 'mus'), exist_ok=True)
 
@@ -388,48 +469,116 @@ def main():
         if name == 'Mchase.exe':
             h = hashlib.sha256(blob).hexdigest()
             if h not in patch_mchase.ORIGINAL_SHA256:
-                sys.exit('Unexpected Mchase.exe on this disc (sha256 %s)' % h)
-            blob = patch_mchase.patch(blob, japanese='--japanese' in flags,
-                                      arrow_keys='--numpad' not in flags,
-                                      portable='--portable' in flags)
+                raise SystemExit('Unexpected Mchase.exe on this disc (sha256 %s)' % h)
+            blob = patch_mchase.patch(blob, japanese=japanese, arrow_keys=arrow_keys,
+                                      portable=portable)
         open(os.path.join(out, name), 'wb').write(blob)
-        print('  ', name)
+        log('   ' + name)
 
     audio = source.audio_tracks
     use_cd = not disc_wav and len(audio) >= 19
     if not disc_wav and not use_cd:
-        print('No CD audio tracks available from this source; using the disc WAV files.')
+        log('No CD audio tracks available from this source; using the disc WAV files.')
+    fallbacks = []
     for n in range(1, 20):
         disc = source.read_file('MUS/TR%02d.WAV' % n)
         dst = os.path.join(out, 'mus', 'TR%02d.WAV' % n)
-        if not use_cd:
-            open(dst, 'wb').write(disc)
-            print('   mus/TR%02d.WAV (disc WAV)' % n)
-            continue
-        # disc WAV n == CD audio track n+1; cut the CD track to the WAV's exact
-        # length (each CD track ends with a few seconds of silence/pregap)
-        frames, rate = wav_frames(disc)
-        read, length = audio[n - 1]
-        want = min(round(frames * 44100 / rate), length * CDDA_FRAMES)
-        sectors = (want + CDDA_FRAMES - 1) // CDDA_FRAMES
-        pcm = bytearray()
-        for off in range(0, sectors, 20):
-            cnt = min(20, sectors - off)
-            pcm += read(off, cnt)
-            print('\r   mus/TR%02d.WAV  %3d%%' % (n, 100 * (off + cnt) // sectors),
-                  end='', flush=True)
-        w = wave.open(dst, 'wb')
-        w.setnchannels(2)
-        w.setsampwidth(2)
-        w.setframerate(44100)
-        w.writeframes(bytes(pcm[:want * 4]))
-        w.close()
-        print()
+        if use_cd:
+            try:
+                rip_track(audio[n - 1], disc, dst, n, progress)
+                log('   mus/TR%02d.WAV' % n)
+                continue
+            except (OSError, ValueError) as e:
+                fallbacks.append(n)
+                log('   mus/TR%02d.WAV: CD audio unreadable (%s), using the disc WAV' % (n, e))
+        else:
+            log('   mus/TR%02d.WAV (disc WAV)' % n)
+        open(dst, 'wb').write(disc)
+    if fallbacks:
+        log('%d track(s) use the lower quality disc WAV: %s' % (
+            len(fallbacks), ', '.join('TR%02d' % n for n in fallbacks)))
+
+    if ddraw:
+        add_cnc_ddraw(out, log)
 
     sh = os.path.join(out, 'magical-chase.sh')
     open(sh, 'w', newline='\n').write(LAUNCHER)
     os.chmod(sh, 0o755)
-    print('Done. Linux: run %s   Windows: run Mchase.exe' % sh)
+
+
+def rip_track(track, disc, dst, n, progress):
+    """Rip CD audio track for disc WAV n to dst. Disc WAV n == CD audio track
+    n+1; the CD track is cut to the WAV's exact length (each CD track ends
+    with a few seconds of silence/pregap)."""
+    frames, rate = wav_frames(disc)
+    read, length = track
+    want = min(round(frames * 44100 / rate), length * CDDA_FRAMES)
+    sectors = (want + CDDA_FRAMES - 1) // CDDA_FRAMES
+    pcm = bytearray()
+    for off in range(0, sectors, 20):
+        cnt = min(20, sectors - off)
+        chunk = read(off, cnt)
+        if len(chunk) < cnt * CDDA_SECTOR:       # truncated image file
+            raise ValueError('image file ends early')
+        pcm += chunk
+        progress('   mus/TR%02d.WAV  %3d%%' % (n, 100 * (off + cnt) // sectors))
+    progress('')
+    w = wave.open(dst, 'wb')
+    w.setnchannels(2)
+    w.setsampwidth(2)
+    w.setframerate(44100)
+    w.writeframes(bytes(pcm[:want * 4]))
+    w.close()
+
+
+def ask(src=''):
+    """Text-mode questions, for when the graphical installer can't run."""
+    def yes(question, default):
+        ans = input('%s (%s): ' % (question, 'Y/n' if default else 'y/N')).strip().lower()
+        return default if not ans else ans.startswith('y')
+
+    src = src or input('Disc drive (e.g. D: or /dev/sr0) or .cue / .iso file: ').strip('" ')
+    default_out = os.path.join(os.path.expanduser('~'), 'Games', 'MagicalChase')
+    out = input('Install folder [%s]: ' % default_out).strip('" ') or default_out
+    print('\nMusic:')
+    for i, (_, label, lines) in enumerate(MUSIC_CHOICES, 1):
+        print('  %d. %s' % (i, label))
+        for line in lines:
+            print(textwrap.fill(line, 76, initial_indent='       ',
+                                subsequent_indent='         '))
+    disc_wav = input('Choose 1 or 2 [1]: ').strip() == '2'
+    print()
+    japanese = yes('Keep the original Japanese menus and settings dialogs?', False)
+    portable = yes('Save settings in the game folder (portable)?', True)
+    ddraw = yes('Download cnc-ddraw for scaled fullscreen / bigger window?', True)
+    print()
+    log = lambda text: print('\r' + text.ljust(70))  # noqa: E731
+    install(src, out, disc_wav=disc_wav, japanese=japanese, portable=portable,
+            ddraw=ddraw, log=log)
+    print('\nStart the game with "%s"' % os.path.join(
+        out, 'Mchase.exe' if os.name == 'nt' else 'magical-chase.sh'))
+
+
+def main():
+    flags = {a for a in sys.argv[1:] if a.startswith('--')}
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    if '--ask' in flags:
+        try:
+            return ask(args[0] if args else '')
+        except (KeyboardInterrupt, EOFError):
+            sys.exit('\nCancelled.')
+    known = {'--disc-wav', '--japanese', '--numpad', '--registry', '--portable',
+             '--no-ddraw'}
+    if len(args) != 2 or flags - known:
+        print(__doc__)
+        sys.exit(1)
+    log = lambda text: print('\r' + text.ljust(70))  # noqa: E731  (overwrites a progress line)
+    install(args[0], args[1], disc_wav='--disc-wav' in flags,
+            japanese='--japanese' in flags, arrow_keys='--numpad' not in flags,
+            portable='--registry' not in flags, ddraw='--no-ddraw' not in flags,
+            log=log)
+    print('Done. Windows: run Mchase.exe   Linux: run %s' %
+          os.path.join(args[1], 'magical-chase.sh'))
 
 
 if __name__ == '__main__':

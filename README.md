@@ -1,67 +1,100 @@
-# Magical Chase (Windows 95) – no-CD + modern Windows patch
+# Ripple's Potion
+
+*A no-CD + modern Windows patch for Magical Chase (Windows 95, QUEST 1998)*
 
 [日本語はこちら (Japanese)](README.ja.md)
 
 Makes the 1998 QUEST PC port of Magical Chase run from the hard drive on
 Windows 10/11 and on Linux (Wine). English menus by default, or keep the
-original Japanese text with `--japanese`.
+original Japanese text.
 
 This repository holds **only the patcher**. You need your own copy of the
 game: the original CD, or a BIN/CUE image of it.
 
 ## Install
 
-You need [Python 3](https://www.python.org/downloads/) (nothing else; on
-Windows tick *"Add python.exe to PATH"* during setup).
+**Windows**: download `RipplesPotion.exe` from the
+[Releases](https://github.com/TremiRodomi/ripples-potion/releases) page and run
+it. Pick the disc drive or a `.cue`/`.iso` file, the install folder and the
+options, then click **Install**. Nothing else is needed. (Some antivirus
+programs distrust new, unsigned exes; if yours complains, use `install.bat`
+below instead.)
 
-**Windows**: double-click `install.bat` and answer the questions, or drag
-the `.cue` file onto it. It can read the disc directly too: enter its drive
-letter, e.g. `D:`.
+**Windows, from the source**: install [Python 3](https://www.python.org/downloads/)
+(tick *"Add python.exe to PATH"* during setup), then double-click
+`install.bat` for the same window. You can also drag a `.cue` file onto it.
 
-**Linux / command line**:
+**Linux**: run `./install.sh` for the same window. It needs tkinter
+(`sudo dnf install python3-tkinter` on Fedora, `sudo apt install python3-tk`
+on Debian/Ubuntu). Without it, or without a display, the installer asks its
+questions in the terminal instead.
+
+### Music
+
+| | CD audio (recommended) | Disc WAV files |
+|---|---|---|
+| Quality | 44.1 kHz 16-bit stereo | 22 kHz 8-bit |
+| Install | slower: reads the whole soundtrack | faster |
+| Size | about 460 MB | about 115 MB |
+| Needs | the disc or a BIN/CUE image | any source, including an ISO |
+
+With CD audio, a track that can't be read (a scratched disc, a truncated
+image) uses its disc WAV instead, so the install still finishes. The
+installer lists which tracks fell back. If your disc is badly damaged, pick
+the disc WAVs: only the data part of the disc is read.
+
+### Options
+
+| Option | Default | Command line |
+|---|---|---|
+| Menus and settings in English or the original Japanese | English | `--japanese` |
+| Portable settings: `MCHASE.INI` in the game folder instead of the registry, so the folder can be moved, copied or kept on a USB stick | on | `--registry` turns it off |
+| Arrow keys for movement (the original used numpad 8/2/4/6) | on | `--numpad` turns it off |
+| [cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw) for scaled fullscreen and windowed play (downloaded from its GitHub release, 2.7 MB) | on | `--no-ddraw` turns it off |
+| Disc WAV music instead of CD audio | off | `--disc-wav` |
+
+### Command line
 
 ```
 ./install.sh <source> <output folder> [options]
+install.bat <source> <output folder> [options]
 python3 patcher/install_magical_chase.py <source> <output folder> [options]
 ```
 
-| Source | Example | Music |
-|---|---|---|
-| BIN/CUE image | `MagicalChase.cue` | CD quality (ripped from the audio tracks) |
-| Original disc, Linux | `/dev/sr0` or the mounted folder | CD quality |
-| Original disc, Windows | `D:` | CD quality |
-| ISO / copied disc folder | `MagicalChase.iso` | disc WAVs (22 kHz 8-bit) |
-
-| Option | Effect |
+| Source | Example |
 |---|---|
-| `--japanese` | Keep the original Japanese menus, dialogs and messages. All fixes are still applied. |
-| `--portable` | Save settings in `MCHASE.INI` in the game folder instead of the Windows registry, so the folder can be moved, copied or kept on a USB stick. |
-| `--numpad` | Keep the original default keys (numpad 8/2/4/6) instead of the arrow keys. |
-| `--disc-wav` | Use the disc's smaller 22 kHz WAVs instead of ripping the CD audio. |
+| BIN/CUE image | `MagicalChase.cue` |
+| Original disc, Linux | `/dev/sr0` or the mounted folder |
+| Original disc, Windows | `D:` |
+| ISO / copied disc folder | `MagicalChase.iso` (disc WAV music only) |
 
 The output folder holds the patched `Mchase.exe`, `mus/TR01–19.WAV`, the
-staff-credits viewer (`STAFF.EXE`) and `magical-chase.sh` (Wine launcher).
+staff-credits viewer (`STAFF.EXE`), `magical-chase.sh` (Wine launcher) and,
+unless `--no-ddraw`, cnc-ddraw (`ddraw.dll`, `ddraw.ini`, `Shaders/`,
+`cnc-ddraw config.exe`).
 
 To patch just the EXE (the original `RUN/MCHASE/SRC/Mchase.exe` from the
 disc; it is checked by SHA-256):
-`python3 patcher/patch_mchase.py [options] Mchase.exe Mchase_patched.exe`
+`python3 patcher/patch_mchase.py [--japanese] [--registry] [--numpad] Mchase.exe Mchase_patched.exe`
 
 ## Running
 
-**Windows 10/11**: run `Mchase.exe`. It switches the screen to 640×480
-HiColor. For a window or scaling, see cnc-ddraw below.
+**Windows 10/11**: run `Mchase.exe`.
 
-**Linux (Wine)**: `./magical-chase.sh`. `--fullscreen` for fullscreen,
-`--window` for a plain unscaled 640×480 window, `--settings` for the
-original AUTORUN settings screen.
+**Linux (Wine)**: `./magical-chase.sh`. `--fullscreen` for Wine's own
+fullscreen, `--window` for a plain unscaled 640×480 window, `--settings` for
+the original AUTORUN settings screen.
 
-**Bigger window / scaling (recommended)**: download the latest
-[cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw/releases) zip and put its
-`ddraw.dll` and `ddraw.ini` in the game folder (the Linux launcher picks it
-up automatically). In `ddraw.ini` set for example `windowed=true`,
-`width=1920`, `height=1440`, `maintas=true` (keep 4:3), and optionally
-`boxing=true` for sharp integer scaling. Use `fullscreen=true` instead for
-scaled borderless fullscreen.
+**With cnc-ddraw** (the default) the game fills the screen at 4:3 with black
+bars. **Alt+Enter** switches to a resizable window; the size and position
+are remembered. To change how it looks, edit `ddraw.ini` (for example
+`boxing=true` for sharp integer scaling) or, on Windows, run
+`cnc-ddraw config.exe`. Reinstalling keeps your `ddraw.ini`.
+
+**Without cnc-ddraw** the game switches the screen to 640×480 HiColor. You
+can add cnc-ddraw later: put the `ddraw.dll` and `ddraw.ini` from its
+[release zip](https://github.com/FunkyFr3sh/cnc-ddraw/releases) in the game
+folder (the Linux launcher picks it up automatically).
 
 ## Controls
 
@@ -72,7 +105,7 @@ scaled borderless fullscreen.
 | S | Option control |
 | Enter | Start |
 | Esc | Pause |
-| Alt+P | Options (change keys, joystick, sound, display) |
+| Alt+P | Options (change keys, joystick, sound test, display) |
 | Alt+Q | Quit |
 
 **Changing keys**: press **Alt+P** (or *Settings › Options…* in the menu
@@ -102,23 +135,27 @@ arrow keys.)
   music-test track names (in both resource languages, so it is English on
   Japanese Windows too). In-game story text is untouched. Skipped with
   `--japanese`.
-* **Sound page always available** in Settings › Options (CD Audio vs WAV,
-  music/SE test). It used to appear only in AUTORUN's settings mode.
-  "CD Audio" plays from the first CD drive like the original did.
-* **Portable settings** (optional, `--portable`): the game's registry reads
-  and writes go to `MCHASE.INI` next to `Mchase.exe` instead. Put the game in
-  a folder you can write to (not `Program Files`).
+* **Music always from the WAV files.** The CD Audio / WAV choice is gone
+  (the installer already put the CD audio in `mus\`), and a CD Audio setting
+  saved by the original game is ignored. The Sound page stays in
+  Settings › Options as a music and sound-effect test; it used to appear only
+  in AUTORUN's settings mode.
+* **Portable settings** (unless `--registry`): the game's registry reads and
+  writes go to `MCHASE.INI` next to `Mchase.exe` instead. Put the game in a
+  folder you can write to (not `Program Files`).
 
 Command-line options still work: `EGOPA242_` = force fullscreen,
-`WGOPA242_D` = debug menu, `WGOPA242_ S` = settings screen,
-`WGOPA242Q` = play CD audio from drive Q:.
+`WGOPA242_D` = debug menu, `WGOPA242_ S` = settings screen.
 
-Settings are stored in `HKCU\Software\QUEST\MagicChase\1.0` (or in
-`MCHASE.INI` with `--portable`).
+Settings are stored in `MCHASE.INI` in the game folder, or in
+`HKCU\Software\QUEST\MagicChase\1.0` with `--registry`.
 
 ## Files
 
 * `install.bat` / `install.sh` – installers for Windows / Linux
+* `.github/workflows/windows-exe.yml` – builds `RipplesPotion.exe` with
+  PyInstaller for each release
+* `patcher/gui.py` – the installer window
 * `patcher/install_magical_chase.py` – installer (image or disc → folder)
 * `patcher/patch_mchase.py` – the EXE patcher
 * `patcher/build_cave.py` – developer tool: assembles the patch code (needs
@@ -127,4 +164,5 @@ Settings are stored in `HKCU\Software\QUEST\MagicChase\1.0` (or in
 ## License
 
 The patcher is MIT licensed (see `LICENSE`). Magical Chase itself is © QUEST /
-Palsoft; this project contains no game data.
+Palsoft; this project contains no game data. cnc-ddraw is © FunkyFr3sh (MIT)
+and is downloaded from its own release, not included here.

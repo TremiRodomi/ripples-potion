@@ -1,24 +1,54 @@
-# マジカルチェイス（Windows 95版）ノーCD・最新Windows対応パッチ
+# Ripple's Potion（リップルのポーション）
+
+*マジカルチェイス（Windows 95版）ノーCD・最新Windows対応パッチ*
 
 [English](README.md)
 
 1998年にクエストから発売されたPC版『マジカルチェイス』を、CDなしで
 Windows 10/11 や Linux（Wine）で遊べるようにするパッチです。
-`--japanese` を付けると、オリジナルの日本語メニュー・ダイアログのまま
-修正だけを適用します。
+インストール時に「Original Japanese」を選ぶと、オリジナルの日本語メニュー・
+ダイアログのまま修正だけを適用します。
 
 このリポジトリに含まれているのは**パッチツールだけ**です。ゲーム本体
 （オリジナルCD、またはそのBIN/CUEイメージ）はご自身でご用意ください。
 
 ## インストール
 
-[Python 3](https://www.python.org/downloads/) が必要です（他には何も要りません）。
-Windowsではインストール時に「Add python.exe to PATH」にチェックを入れてください。
+**Windows（かんたん）**: [Releases](https://github.com/TremiRodomi/ripples-potion/releases)
+ページから `RipplesPotion.exe` をダウンロードして実行します。他には何も要りません
+（新しい署名なしのexeをウイルス対策ソフトが警告する場合は、下の `install.bat` を使ってください）。
 
-**Windows**: `install.bat` をダブルクリックして質問に答えます。
-「Keep the original Japanese menus?」には `y` と答えると日本語のままになります。
-`.cue` ファイルを `install.bat` にドラッグ＆ドロップしてもOKです。
-CDから直接インストールする場合はドライブ名（例: `D:`）を入力します。
+**Windows（ソースから）**: [Python 3](https://www.python.org/downloads/) をインストールし
+（「Add python.exe to PATH」にチェック）、`install.bat` をダブルクリックするとインストーラーの画面が開きます。
+CDドライブまたは `.cue` / `.iso` ファイル、インストール先、オプションを選んで
+**Install** を押します。`.cue` ファイルを `install.bat` にドラッグ＆ドロップしてもOKです。
+
+**Linux**: `./install.sh` で同じ画面が開きます（tkinterが必要です。Fedora:
+`sudo dnf install python3-tkinter`、Debian/Ubuntu: `sudo apt install python3-tk`）。
+tkinterや画面がない場合は、ターミナルで質問に答える形式になります。
+
+### 音楽
+
+| | CD音源（おすすめ） | ディスク内のWAV |
+|---|---|---|
+| 音質 | 44.1kHz 16ビット ステレオ | 22kHz 8ビット |
+| インストール | 遅め（サウンドトラック全体を読み込み） | 速い |
+| 容量 | 約460MB | 約115MB |
+| 必要なもの | ディスクまたはBIN/CUEイメージ | どれでも可（ISOも可） |
+
+CD音源を選んだ場合でも、読めない曲（ディスクの傷など）はその曲だけディスク内の
+WAVを使うので、インストールは最後まで完了します。ディスクの傷がひどい場合は
+「Disc WAV files」を選んでください（データ部分しか読みません）。
+
+### オプション
+
+| オプション | 標準 | コマンドライン |
+|---|---|---|
+| メニューと設定画面を英語またはオリジナルの日本語に | 英語 | `--japanese` |
+| ポータブル設定：設定をレジストリではなくゲームフォルダの `MCHASE.INI` に保存（フォルダごと移動・コピー可能） | オン | `--registry` でオフ |
+| 移動キーを矢印キーに（元はテンキー 8/2/4/6） | オン | `--numpad` でオフ |
+| [cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw)（拡大フルスクリーン・ウィンドウ表示。GitHubのリリースからダウンロード、2.7MB） | オン | `--no-ddraw` でオフ |
+| CD音源ではなくディスク内のWAVを使う | オフ | `--disc-wav` |
 
 **コマンドライン**:
 
@@ -27,20 +57,17 @@ py -3 patcher\install_magical_chase.py D: C:\Games\MagicalChase --japanese
 python3 patcher/install_magical_chase.py MagicalChase.cue ~/Games/MagicalChase --japanese
 ```
 
-| オプション | 内容 |
-|---|---|
-| `--japanese` | オリジナルの日本語テキストのまま（修正はすべて適用） |
-| `--portable` | 設定をレジストリではなくゲームフォルダの `MCHASE.INI` に保存（フォルダごと移動・コピー可能） |
-| `--numpad` | 移動キーを元のテンキー（8/2/4/6）のままにする（標準は矢印キー） |
-| `--disc-wav` | CD音源を取り込まず、ディスク内の22kHz WAVを使う |
-
 ## 遊び方
 
-`Mchase.exe` を実行します。画面は640×480 HiColorに切り替わります。
-ウィンドウ表示や拡大表示をしたい場合は
-[cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw/releases) の
-`ddraw.dll` と `ddraw.ini` をゲームフォルダに置いてください
-（`ddraw.ini` で `windowed=true`、`width=1920`、`height=1440`、`maintas=true` など）。
+`Mchase.exe`（Linuxでは `./magical-chase.sh`）を実行します。
+
+cnc-ddraw（標準でオン）を使うと、画面いっぱいに4:3で表示されます。
+**Alt+Enter** でサイズ変更できるウィンドウ表示に切り替わります（大きさと位置は
+記憶されます）。見た目は `ddraw.ini`（例：`boxing=true` で整数倍拡大）か、
+Windowsでは `cnc-ddraw config.exe` で変更できます。再インストールしても
+`ddraw.ini` はそのまま残ります。
+
+cnc-ddrawなしの場合は、画面が640×480 HiColorに切り替わります。
 
 ## 操作
 
@@ -51,7 +78,7 @@ python3 patcher/install_magical_chase.py MagicalChase.cue ~/Games/MagicalChase -
 | S | オプション操作 |
 | Enter | スタート |
 | Esc | ポーズ |
-| Alt+P | オプション（キー・ジョイスティック・サウンド設定） |
+| Alt+P | オプション（キー・ジョイスティック・サウンドテスト設定） |
 | Alt+Q | 終了 |
 
 **キー設定の変更**: **Alt+P**（またはメニューの「設定 › オプション」）→
@@ -63,9 +90,10 @@ python3 patcher/install_magical_chase.py MagicalChase.cue ~/Games/MagicalChase -
 * **32ビットカラーのデスクトップ対応**: 640×480×16ビットのフルスクリーンで起動します。
 * **ジョイスティックのクラッシュ修正**（公式 `mc_patch.exe` と同じ修正。重ねて当てないでください）。
 * **移動キーを矢印キーに**（テンキーのないノートPC向け）。
-* **サウンド設定ページ**（CD-DA / WAV切替、音楽・効果音テスト）を常に表示。
+* **音楽は常にWAVから再生**: CD-DA / WAVの切替はなくなりました（CD音源はインストール時に
+  `mus\` に取り込み済み）。サウンド設定ページは音楽・効果音テストとして常に表示されます。
 * **英語化**（`--japanese` の場合は行いません）。
-* **ポータブル設定**（`--portable` の場合のみ）。
+* **ポータブル設定**（`--registry` の場合を除く）。
 
 ## 注意
 
@@ -73,5 +101,5 @@ python3 patcher/install_magical_chase.py MagicalChase.cue ~/Games/MagicalChase -
   「ベータ: ワールドワイド言語サポートで Unicode UTF-8 を使用」を有効にした
   環境では、ジョイスティックの軸名が文字化けすることがあります
   （ゲームの動作には影響しません）。
-* `--portable` の場合は、書き込み可能なフォルダ（`Program Files` 以外）に
+* ポータブル設定の場合は、書き込み可能なフォルダ（`Program Files` 以外）に
   インストールしてください。
