@@ -77,7 +77,7 @@ python3 patcher/install_magical_chase.py <source> <output folder> [options]
 | ISO / copied disc folder | `MagicalChase.iso` (disc WAV music only) |
 
 The output folder holds the patched `Mchase.exe`, `mus/TR01–19.WAV`, the
-staff-credits viewer (`STAFF.EXE`), `magical-chase.sh` (Wine launcher) and,
+staff-credits viewer (`STAFF.EXE`), `magical-chase.sh` (Wine launcher; Linux installs only) and,
 unless `--no-ddraw`, cnc-ddraw (`ddraw.dll`, `ddraw.ini`, `Shaders/`,
 `cnc-ddraw config.exe`).
 

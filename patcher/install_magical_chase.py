@@ -34,7 +34,7 @@ Result:
     <output>/Mchase.exe         patched game
     <output>/mus/TR01-19.WAV    music (CD quality by default)
     <output>/STAFF.EXE + BMPs   staff-credits viewer from the disc
-    <output>/magical-chase.sh   Linux/Wine launcher
+    <output>/magical-chase.sh   Linux/Wine launcher (not written on Windows)
     <output>/ddraw.dll, ddraw.ini, Shaders/, cnc-ddraw config.exe   (cnc-ddraw)
 
 Only the Python 3 standard library is needed.
@@ -359,9 +359,11 @@ DDRAW_URL = ('https://github.com/FunkyFr3sh/cnc-ddraw/releases/download/'
              'v7.1.0.0/cnc-ddraw.zip')
 DDRAW_SHA256 = '0b13ab89a64c9918189b1dadd449ef6ed3cb3b7b19cabd96d8adbd95505bb908'
 # Scaled borderless fullscreen keeping 4:3 (fits any screen); Alt+Enter
-# switches to a resizable window.
+# switches to a resizable window. devmode=true leaves the cursor free
+# ("Lock cursor" off in cnc-ddraw config.exe), so the game's own settings
+# menu can be reached in fullscreen.
 DDRAW_SETTINGS = dict(fullscreen='true', windowed='true', maintas='true',
-                      aspect_ratio='4:3')
+                      aspect_ratio='4:3', devmode='true')
 
 
 def add_cnc_ddraw(out, log):
@@ -501,9 +503,10 @@ def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
     if ddraw:
         add_cnc_ddraw(out, log)
 
-    sh = os.path.join(out, 'magical-chase.sh')
-    open(sh, 'w', newline='\n').write(LAUNCHER)
-    os.chmod(sh, 0o755)
+    if os.name != 'nt':                 # the Wine launcher is useless on Windows
+        sh = os.path.join(out, 'magical-chase.sh')
+        open(sh, 'w', newline='\n').write(LAUNCHER)
+        os.chmod(sh, 0o755)
 
 
 def rip_track(track, disc, dst, n, progress):
