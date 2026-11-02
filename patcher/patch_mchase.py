@@ -29,6 +29,9 @@ What it changes (the original file is never modified):
   * Menus, settings dialogs, messages, joystick axis names and BGM track names
     translated to English (both the 0x409 and 0x411 resource languages).
     Skipped with --japanese.
+  * In-game text in English, from the US PC Engine release: shop, difficulty
+    and continue screens, results screen and end-of-mode messages, with its
+    font (english_text.py). Skipped with --japanese.
   * Settings saved in MCHASE.INI next to the EXE (portable), unless --registry.
 
 Only the Python 3 standard library is needed.
@@ -187,6 +190,8 @@ DIALOG_TEXT = {
     '効果音': 'Sound effects',
 }
 
+# BGM track names (50021-50039) use the same wording as the in-game sound
+# test titles in english_text.SOUND_TEST_TITLES, which must fit 19 columns.
 STRINGS = {
     1: 'Magical Chase for Windows 95',
     3: 'Options',
@@ -204,20 +209,20 @@ STRINGS = {
     50019: 'To start the program, run autorun.exe.',
     50020: 'This program only works in 256-color or 65536-color (HiColor) display modes.',
     50021: 'Azure Way',
-    50022: 'Here Comes the Devil, Singing a Song',
+    50022: 'Devil Comes Singing',
     50023: 'Gizmo Dancing',
     50024: "It's Not a Bug!",
     50025: "It's Not Ice!",
     50026: 'Whoosh~ Whoosh~',
     50027: 'Gizmo March',
     50028: 'Uncle Pumpkin',
-    50029: "Can't You Sit Still?!",
+    50029: "Can't Sit Still?!",
     50030: 'Rampish Chase',
-    50031: 'Phew, Thank Goodness...! Part 1',
-    50032: 'Variations on a Melody of the Ra Tribe',
-    50033: 'Meditation Waltz Part 1 (unused)',
-    50034: 'Meditation Waltz Part 2',
-    50035: 'Phew, Thank Goodness...! Part 2',
+    50031: 'Thank Goodness! 1',
+    50032: 'Ra Tribe Variations',
+    50033: 'Meditation Waltz 1 (unused)',
+    50034: 'Meditation Waltz 2',
+    50035: 'Thank Goodness! 2',
     50036: 'Termination',
     50037: "Ripple's Theme",
     50038: 'Ending',
@@ -425,14 +430,42 @@ def parse_string_block(b):
     return res
 
 # ----------------------------------------------------------------------------
-def patch(src, japanese=False, arrow_keys=True, portable=True):
+def bmh_resources(pe):
+    """{name: (file offset, size)} of the game's BMH (graphics bank) resources."""
+    out = {}
+    for t, n, lang, entry in walk_resources(pe):
+        if t == 'BMH':
+            rva, size = struct.unpack_from('<II', pe.d, entry)
+            out[n] = (pe.off(rva), size)
+    return out
+
+
+def patch(src, japanese=False, arrow_keys=True, portable=True, us_rom=None):
     """Return the patched EXE.
     japanese:   keep the original Japanese text
     arrow_keys: default movement keys are the arrow keys (not numpad 8/2/4/6)
     portable:   settings go to MCHASE.INI next to the EXE, not the registry
-                (False = registry, like the original game)"""
+                (False = registry, like the original game)
+    us_rom:     the US PC Engine ROM to take the in-game English from;
+                None = the copy bundled in english_data.py"""
     pe = PE(src)
+    ingame = None
+    if not japanese:
+        import english_text
+        banks = bmh_resources(pe)
+        orig = {n: bytes(pe.d[o:o + s]) for n, (o, s) in banks.items()
+                if n in english_text.BANKS}
+        ingame = english_text.build(us_rom, orig)
+        for n, data in ingame['banks'].items():
+            o, s = banks[n]
+            assert len(data) == s
+            pe.d[o:o + s] = data
+        for va, data in ingame['inplace']:
+            o = pe.off(va - IMAGE_BASE)
+            pe.d[o:o + len(data)] = data
     code = list(CODE_PATCHES)
+    if ingame:
+        code += ingame['code']
     if arrow_keys:
         code.append((DEFAULT_KEYS_VA, DEFAULT_KEYS_NUMPAD, DEFAULT_KEYS_ARROWS))
     if portable:
@@ -502,6 +535,20 @@ def patch(src, japanese=False, arrow_keys=True, portable=True):
         rva = SEC_VA - IMAGE_BASE + len(sec)
         sec += blob
         struct.pack_into('<II', pe.d, entry, rva, len(blob))
+
+    # 4b. English in-game text from the US ROM: new strings go in the section
+    # and every reference to the old ones is pointed at them
+    if ingame:
+        where = {}
+        for name, blob in ingame['blobs'].items():
+            while len(sec) % 16:
+                sec.append(0)
+            where[name] = SEC_VA + len(sec)
+            sec += blob
+        for name, va, off, old in ingame['relocs']:
+            o = pe.off(va - IMAGE_BASE)
+            assert old is None or struct.unpack_from('<I', pe.d, o)[0] == old, hex(va)
+            struct.pack_into('<I', pe.d, o, where[name] + off)
 
     # 5. append the section (after any overlay, file-aligned)
     falign = struct.unpack_from('<I', pe.d, pe.opt + 36)[0]

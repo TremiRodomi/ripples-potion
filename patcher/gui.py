@@ -105,7 +105,7 @@ class App:
         self.japanese = tk.BooleanVar(value=False)
         lang = ttk.Frame(box)
         lang.grid(sticky='w')
-        ttk.Label(lang, text='Menus and settings:').grid(row=0, column=0)
+        ttk.Label(lang, text='Menus and in-game text:').grid(row=0, column=0)
         ttk.Radiobutton(lang, text='English', value=False, variable=self.japanese).grid(
             row=0, column=1, padx=6)
         ttk.Radiobutton(lang, text='Original Japanese (日本語)', value=True,

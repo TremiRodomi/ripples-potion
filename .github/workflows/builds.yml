@@ -37,7 +37,7 @@ jobs:
         run: |
           python -c "import tkinter; print('tk', tkinter.TkVersion)"
           pip install pyinstaller==6.11.1
-          pyinstaller --onefile ${{ matrix.flags }} --name "${{ matrix.file }}" --paths patcher patcher/gui.py
+          pyinstaller --onefile ${{ matrix.flags }} --name "${{ matrix.file }}" --paths patcher --hidden-import english_text --hidden-import english_data patcher/gui.py
           ls -l dist
       - name: Smoke test
         if: runner.os == 'Linux'

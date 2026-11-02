@@ -19,8 +19,8 @@ Usage:
                  the 44.1 kHz CD audio tracks (smaller, lower quality, faster;
                  also handy for a scratched disc). Without it, any CD audio
                  track that can't be read falls back to its disc WAV anyway.
-    --japanese   keep the original Japanese menus and dialogs (only the
-                 compatibility fixes are applied)
+    --japanese   keep the original Japanese menus, dialogs and in-game text
+                 (only the compatibility fixes are applied)
     --numpad     keep the original default keys (numpad 8/2/4/6) instead of
                  the arrow keys
     --no-ddraw   don't download cnc-ddraw (by default it is downloaded from
@@ -551,7 +551,7 @@ def ask(src=''):
                                 subsequent_indent='         '))
     disc_wav = input('Choose 1 or 2 [1]: ').strip() == '2'
     print()
-    japanese = yes('Keep the original Japanese menus and settings dialogs?', False)
+    japanese = yes('Keep the original Japanese menus, dialogs and in-game text?', False)
     portable = yes('Save settings in the game folder (portable)?', True)
     ddraw = yes('Download cnc-ddraw for scaled fullscreen / bigger window?', True)
     print()
