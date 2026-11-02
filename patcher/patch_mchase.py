@@ -190,8 +190,6 @@ DIALOG_TEXT = {
     '効果音': 'Sound effects',
 }
 
-# BGM track names (50021-50039) use the same wording as the in-game sound
-# test titles in english_text.SOUND_TEST_TITLES, which must fit 19 columns.
 STRINGS = {
     1: 'Magical Chase for Windows 95',
     3: 'Options',
@@ -209,20 +207,20 @@ STRINGS = {
     50019: 'To start the program, run autorun.exe.',
     50020: 'This program only works in 256-color or 65536-color (HiColor) display modes.',
     50021: 'Azure Way',
-    50022: 'Devil Comes Singing',
+    50022: 'Here Comes the Devil, Singing a Song',
     50023: 'Gizmo Dancing',
     50024: "It's Not a Bug!",
     50025: "It's Not Ice!",
     50026: 'Whoosh~ Whoosh~',
     50027: 'Gizmo March',
     50028: 'Uncle Pumpkin',
-    50029: "Can't Sit Still?!",
+    50029: "Can't You Sit Still?!",
     50030: 'Rampish Chase',
-    50031: 'Thank Goodness! 1',
-    50032: 'Ra Tribe Variations',
-    50033: 'Meditation Waltz 1 (unused)',
-    50034: 'Meditation Waltz 2',
-    50035: 'Thank Goodness! 2',
+    50031: 'Phew, Thank Goodness...! Part 1',
+    50032: 'Variations on a Melody of the Ra Tribe',
+    50033: 'Meditation Waltz Part 1 (unused)',
+    50034: 'Meditation Waltz Part 2',
+    50035: 'Phew, Thank Goodness...! Part 2',
     50036: 'Termination',
     50037: "Ripple's Theme",
     50038: 'Ending',

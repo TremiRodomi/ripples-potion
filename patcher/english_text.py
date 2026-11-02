@@ -110,31 +110,6 @@ WINDOWS = [
 ]
 
 
-# In-game sound test (window 0x0E): 18 entries of 2 rows x 24 tile words at
-# SOUND_TEST_VA + 0x60 * n. Row 1 is the dakuten row (its last word is the
-# tens digit), row 2 the units digit, two blanks and the title in columns
-# 3-21. The US release left these titles in Japanese; the ones in kana get
-# short forms of the English names used on the Options > Sound page.
-SOUND_TEST_VA = 0x461AC0
-SOUND_TEST_TITLES = {
-    1: 'Devil Comes Singing', 3: "It's Not a Bug!", 4: "It's Not Ice!",
-    5: 'Whoosh~ Whoosh~', 9: 'Thank Goodness! 1', 10: 'Ra Tribe Variations',
-    11: 'Meditation Waltz 1', 12: 'Meditation Waltz 2', 13: 'Thank Goodness! 2',
-    15: "Ripple's Theme", 17: "Can't Sit Still?!",
-}
-
-
-def sound_test_patches():
-    out = []
-    for n, title in SOUND_TEST_TITLES.items():
-        va = SOUND_TEST_VA + 0x60 * n
-        out.append((va, struct.pack('<23H', *[0x0280] * 23)))   # no dakuten
-        out.append((va + 2 * (24 + 3), b''.join(
-            struct.pack('<H', window_rows([title], 19, 0x0300, 0x0280)[i])
-            for i in range(19))))
-    return out
-
-
 def lz_decompress(rom, pos, n):
     """Magical Chase PCE graphics compression: 256-byte blocks, each starting
     with its escape byte. <esc> d l = copy l bytes from d back,
@@ -429,7 +404,6 @@ def build(us_rom, banks):
     # --- window tile maps: difficulty select and continue screen ---
     for va, words in WINDOWS:
         inplace.append((va, b''.join(struct.pack('<H', w) for w in words())))
-    inplace += sound_test_patches()
 
     # "CRYSTAL" instead of くりすたる on the clear bonus screen (US sprites)
     spr = lz_decompress(us, US_SPRITES_3A, CRYSTAL_SPRITES.stop)
