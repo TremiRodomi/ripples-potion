@@ -38,6 +38,10 @@ tkinter (`sudo dnf install python3-tkinter` on Fedora,
 `sudo apt install python3-tk` on Debian/Ubuntu). Without it, or without a
 display, the installer asks its questions in the terminal instead.
 
+The installer itself is in English or Japanese, following the system
+language. Switch with the menu at the top right of the window, or pass
+`--lang=ja` / `--lang=en`.
+
 ### Music
 
 | | CD audio (recommended) | Disc WAV files |
@@ -56,7 +60,7 @@ the disc WAVs: only the data part of the disc is read.
 
 | Option | Default | Command line |
 |---|---|---|
-| Menus, settings and in-game text in English or the original Japanese | English | `--japanese` |
+| Menus, settings and in-game text in English or the original Japanese | English (Japanese when the installer is in Japanese) | `--japanese` |
 | Portable settings: `MCHASE.INI` in the game folder instead of the registry, so the folder can be moved, copied or kept on a USB stick | on | `--registry` turns it off |
 | Arrow keys for movement (the original used numpad 8/2/4/6) | on | `--numpad` turns it off |
 | [cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw) for scaled fullscreen and windowed play (downloaded from its GitHub release, 2.7 MB) | on | `--no-ddraw` turns it off |

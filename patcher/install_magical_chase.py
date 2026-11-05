@@ -29,6 +29,8 @@ Usage:
     --registry   save settings in the Windows registry like the original game,
                  instead of MCHASE.INI in the game folder (the default, which
                  lets the folder be moved or copied)
+    --lang=ja    show the installer's own messages in Japanese (--lang=en for
+                 English; by default the system's language is used)
 
 Result:
     <output>/Mchase.exe         patched game
@@ -53,6 +55,8 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import patch_mchase  # noqa: E402
+import lang  # noqa: E402
+from lang import t  # noqa: E402
 
 GAME_FILES = ['Mchase.exe', 'STAFF.EXE', 'STAFF.BMP', 'STAFF8C.BMP']
 CDDA_SECTOR = 2352            # bytes of 44.1 kHz 16-bit stereo per CD sector
@@ -141,14 +145,14 @@ class CueSource:
             if m:
                 i, mm, ss, ff = map(int, m.groups())
                 tracks[-1]['idx'][i] = (mm * 60 + ss) * 75 + ff
-        for i, t in enumerate(tracks):
-            t['ssize'] = 2048 if t['mode'] == 'MODE1/2048' else CDDA_SECTOR
+        for i, trk in enumerate(tracks):
+            trk['ssize'] = 2048 if trk['mode'] == 'MODE1/2048' else CDDA_SECTOR
             nxt = tracks[i + 1] if i + 1 < len(tracks) else None
-            if nxt and nxt['file'] == t['file']:
+            if nxt and nxt['file'] == trk['file']:
                 end = min(nxt['idx'].values())
             else:
-                end = os.path.getsize(t['file']) // t['ssize']
-            t['start'], t['length'] = t['idx'][1], end - t['idx'][1]
+                end = os.path.getsize(trk['file']) // trk['ssize']
+            trk['start'], trk['length'] = trk['idx'][1], end - trk['idx'][1]
         return tracks
 
     @staticmethod
@@ -333,7 +337,7 @@ def open_source(src):
             try:
                 return WindowsDrive(m.group(1).upper())
             except OSError as e:
-                print('Could not read the drive directly (%s); copying files only.' % e)
+                print(t('Could not read the drive directly (%s); copying files only.') % e)
                 return FolderSource(m.group(1) + ':\\')
     if os.path.isdir(src):
         dev = mount_to_device(src) if os.name != 'nt' else None
@@ -341,14 +345,15 @@ def open_source(src):
             try:
                 return LinuxDrive(dev)
             except OSError as e:
-                print('Could not read %s directly (%s); copying files only.' % (dev, e))
+                print(t('Could not read %s directly (%s); copying files only.') % (dev, e))
         return FolderSource(src)
     if os.name != 'nt':
         try:
             return LinuxDrive(src)
         except OSError as e:
-            raise SystemExit('Cannot read %s: %s (is the disc inserted?)' % (src, e.strerror or e))
-    raise SystemExit('Unrecognised source: %s' % src)
+            raise SystemExit(t('Cannot read %s: %s (is the disc inserted?)') %
+                             (src, e.strerror or e))
+    raise SystemExit(t('Unrecognised source: %s') % src)
 
 
 # --------------------------------------------------------------------------
@@ -373,11 +378,11 @@ def add_cnc_ddraw(out, log):
         with urllib.request.urlopen(DDRAW_URL, timeout=60) as r:
             blob = r.read()
         if hashlib.sha256(blob).hexdigest() != DDRAW_SHA256:
-            raise ValueError('the download does not match the expected file')
+            raise ValueError(t('the download does not match the expected file'))
         z = zipfile.ZipFile(io.BytesIO(blob))
     except (OSError, ValueError, zipfile.BadZipFile) as e:
-        log('cnc-ddraw not installed (%s). The game still works; see the README to '
-            'add it by hand.' % e)
+        log(t('cnc-ddraw not installed (%s). The game still works; see the README to '
+              'add it by hand.') % e)
         return
     keep_ini = os.path.exists(os.path.join(out, 'ddraw.ini'))
     for info in z.infolist():
@@ -392,8 +397,8 @@ def add_cnc_ddraw(out, log):
         if parts == ['ddraw.ini']:
             data = ddraw_ini(data)
         open(dst, 'wb').write(data)
-    log('   cnc-ddraw (scaled fullscreen, Alt+Enter for a window)' +
-        ('; kept your ddraw.ini' if keep_ini else ''))
+    log(t('   cnc-ddraw (scaled fullscreen, Alt+Enter for a window)') +
+        (t('; kept your ddraw.ini') if keep_ini else ''))
 
 
 def ddraw_ini(data):
@@ -410,6 +415,7 @@ def ddraw_ini(data):
 
 # --------------------------------------------------------------------------
 # The music choice as the installers (GUI and install.bat) explain it.
+# The text is English; pass it through t() when showing it.
 MUSIC_CHOICES = [
     ('cd', 'CD audio (recommended)', [
         '+ Best quality: 44.1 kHz 16-bit stereo',
@@ -471,7 +477,7 @@ def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
         if name == 'Mchase.exe':
             h = hashlib.sha256(blob).hexdigest()
             if h not in patch_mchase.ORIGINAL_SHA256:
-                raise SystemExit('Unexpected Mchase.exe on this disc (sha256 %s)' % h)
+                raise SystemExit(t('Unexpected Mchase.exe on this disc (sha256 %s)') % h)
             blob = patch_mchase.patch(blob, japanese=japanese, arrow_keys=arrow_keys,
                                       portable=portable)
         open(os.path.join(out, name), 'wb').write(blob)
@@ -480,7 +486,7 @@ def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
     audio = source.audio_tracks
     use_cd = not disc_wav and len(audio) >= 19
     if not disc_wav and not use_cd:
-        log('No CD audio tracks available from this source; using the disc WAV files.')
+        log(t('No CD audio tracks available from this source; using the disc WAV files.'))
     fallbacks = []
     for n in range(1, 20):
         disc = source.read_file('MUS/TR%02d.WAV' % n)
@@ -492,12 +498,12 @@ def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
                 continue
             except (OSError, ValueError) as e:
                 fallbacks.append(n)
-                log('   mus/TR%02d.WAV: CD audio unreadable (%s), using the disc WAV' % (n, e))
+                log(t('   mus/TR%02d.WAV: CD audio unreadable (%s), using the disc WAV') % (n, e))
         else:
-            log('   mus/TR%02d.WAV (disc WAV)' % n)
+            log(t('   mus/TR%02d.WAV (disc WAV)') % n)
         open(dst, 'wb').write(disc)
     if fallbacks:
-        log('%d track(s) use the lower quality disc WAV: %s' % (
+        log(t('%d track(s) use the lower quality disc WAV: %s') % (
             len(fallbacks), ', '.join('TR%02d' % n for n in fallbacks)))
 
     if ddraw:
@@ -522,7 +528,7 @@ def rip_track(track, disc, dst, n, progress):
         cnt = min(20, sectors - off)
         chunk = read(off, cnt)
         if len(chunk) < cnt * CDDA_SECTOR:       # truncated image file
-            raise ValueError('image file ends early')
+            raise ValueError(t('image file ends early'))
         pcm += chunk
         progress('   mus/TR%02d.WAV  %3d%%' % (n, 100 * (off + cnt) // sectors))
     progress('')
@@ -534,42 +540,60 @@ def rip_track(track, disc, dst, n, progress):
     w.close()
 
 
+def wrap(text, first, rest):
+    """textwrap.fill to 76 columns. Japanese has no spaces and each character
+    takes two columns, so it is wrapped after a comma instead."""
+    if lang.lang != 'ja':
+        return textwrap.fill(text, 76, initial_indent=first, subsequent_indent=rest)
+    width = (76 - len(rest)) // 2
+    out = ['']
+    for piece in re.findall(r'[^、]+、?', text):
+        if out[-1] and len(out[-1]) + len(piece) > width:
+            out.append('')
+        out[-1] += piece
+    return '\n'.join((first if i == 0 else rest) + line for i, line in enumerate(out))
+
+
 def ask(src=''):
     """Text-mode questions, for when the graphical installer can't run."""
     def yes(question, default):
-        ans = input('%s (%s): ' % (question, 'Y/n' if default else 'y/N')).strip().lower()
+        ans = input('%s (%s): ' % (t(question), 'Y/n' if default else 'y/N')).strip().lower()
         return default if not ans else ans.startswith('y')
 
-    src = src or input('Disc drive (e.g. D: or /dev/sr0) or .cue / .iso file: ').strip('" ')
+    src = src or input(t('Disc drive (e.g. D: or /dev/sr0) or .cue / .iso file: ')).strip('" ')
     default_out = os.path.join(os.path.expanduser('~'), 'Games', 'MagicalChase')
-    out = input('Install folder [%s]: ' % default_out).strip('" ') or default_out
-    print('\nMusic:')
+    out = input(t('Install folder [%s]: ') % default_out).strip('" ') or default_out
+    print(t('\nMusic:'))
     for i, (_, label, lines) in enumerate(MUSIC_CHOICES, 1):
-        print('  %d. %s' % (i, label))
+        print('  %d. %s' % (i, t(label)))
         for line in lines:
-            print(textwrap.fill(line, 76, initial_indent='       ',
-                                subsequent_indent='         '))
-    disc_wav = input('Choose 1 or 2 [1]: ').strip() == '2'
+            print(wrap(t(line), '       ', '         '))
+    disc_wav = input(t('Choose 1 or 2 [1]: ')).strip() == '2'
     print()
-    japanese = yes('Keep the original Japanese menus, dialogs and in-game text?', False)
+    japanese = yes('Keep the original Japanese menus, dialogs and in-game text?',
+                   lang.lang == 'ja')
     portable = yes('Save settings in the game folder (portable)?', True)
     ddraw = yes('Download cnc-ddraw for scaled fullscreen / bigger window?', True)
     print()
     log = lambda text: print('\r' + text.ljust(70))  # noqa: E731
     install(src, out, disc_wav=disc_wav, japanese=japanese, portable=portable,
             ddraw=ddraw, log=log)
-    print('\nStart the game with "%s"' % os.path.join(
+    print(t('\nStart the game with "%s"') % os.path.join(
         out, 'Mchase.exe' if os.name == 'nt' else 'magical-chase.sh'))
 
 
 def main():
-    flags = {a for a in sys.argv[1:] if a.startswith('--')}
+    try:                    # never crash on a console that can't show Japanese
+        sys.stdout.reconfigure(errors='replace')
+    except AttributeError:
+        pass
+    flags = {a for a in sys.argv[1:] if a.startswith('--') and not a.startswith('--lang=')}
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if '--ask' in flags:
         try:
             return ask(args[0] if args else '')
         except (KeyboardInterrupt, EOFError):
-            sys.exit('\nCancelled.')
+            sys.exit(t('\nCancelled.'))
     known = {'--disc-wav', '--japanese', '--numpad', '--registry', '--portable',
              '--no-ddraw'}
     if len(args) != 2 or flags - known:
@@ -580,7 +604,7 @@ def main():
             japanese='--japanese' in flags, arrow_keys='--numpad' not in flags,
             portable='--registry' not in flags, ddraw='--no-ddraw' not in flags,
             log=log)
-    print('Done. Windows: run Mchase.exe   Linux: run %s' %
+    print(t('Done. Windows: run Mchase.exe   Linux: run %s') %
           os.path.join(args[1], 'magical-chase.sh'))
 
 

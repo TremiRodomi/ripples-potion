@@ -5,6 +5,8 @@ Ripple's Potion - graphical installer for Magical Chase (Windows 95).
     python3 gui.py [source]
     python3 gui.py --ask [source]                       text questions
     python3 gui.py <source> <output folder> [options]   command line
+    --lang=ja / --lang=en                               installer language
+                                                        (default: the system's)
 
 The last two forms are the same as install_magical_chase.py; they make the
 single-file builds (RipplesPotion.exe, RipplesPotion-linux-x86_64) all-in-one.
@@ -21,17 +23,20 @@ import subprocess
 import sys
 import threading
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import lang  # noqa: E402
+from lang import t  # noqa: E402
+
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
 except ImportError:
-    print('tkinter is not installed, so the graphical installer cannot start.')
+    print(t('tkinter is not installed, so the graphical installer cannot start.'))
     if sys.platform.startswith('linux'):
         print('Fedora: sudo dnf install python3-tkinter   '
               'Debian/Ubuntu: sudo apt install python3-tk')
     sys.exit(3)
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import install_magical_chase as inst  # noqa: E402
 
 TITLE = "Ripple's Potion"
@@ -57,71 +62,96 @@ class App:
         self.events = queue.Queue()
         self.out_dir = None
         self.done_steps = 0
-        root.title(TITLE + ' - Magical Chase installer')
+        self.main = None
         root.resizable(False, False)
-        main = ttk.Frame(root, padding=10)
+        drives = cd_drives()
+        self.drives = drives
+        self.source = tk.StringVar(value=source or (drives[0] if drives else ''))
+        self.out = tk.StringVar(value=DEFAULT_OUT)
+        self.music = tk.StringVar(value='cd')
+        self.japanese = tk.BooleanVar(value=lang.lang == 'ja')
+        self.portable = tk.BooleanVar(value=True)
+        self.arrows = tk.BooleanVar(value=True)
+        self.ddraw = tk.BooleanVar(value=True)
+        names = dict(lang.LANGUAGES)
+        self.ui_lang = tk.StringVar(value=names[lang.lang])
+        self.build()
+
+    def switch_language(self, _event=None):
+        code = {name: code for code, name in lang.LANGUAGES}[self.ui_lang.get()]
+        if code != lang.lang:
+            lang.set_language(code)
+            self.build()
+
+    def build(self):
+        """Create the window's contents in the current language."""
+        root = self.root
+        if self.main is not None:
+            self.main.destroy()
+        root.title('%s - %s' % (TITLE, t('Magical Chase installer')))
+        main = self.main = ttk.Frame(root, padding=10)
         main.grid(sticky='nsew')
         main.columnconfigure(0, weight=1)
 
-        ttk.Label(main, text=TITLE, font=('TkDefaultFont', 16, 'bold')).grid(sticky='w')
-        ttk.Label(main, text=SUBTITLE).grid(sticky='w', pady=(0, 10))
+        head = ttk.Frame(main)
+        head.grid(sticky='ew')
+        head.columnconfigure(0, weight=1)
+        ttk.Label(head, text=TITLE, font=('TkDefaultFont', 16, 'bold')).grid(
+            row=0, column=0, sticky='w')
+        self.lang_box = ttk.Combobox(head, textvariable=self.ui_lang, state='readonly',
+                                     values=[name for _, name in lang.LANGUAGES], width=8)
+        self.lang_box.grid(row=0, column=1, sticky='ne')
+        self.lang_box.bind('<<ComboboxSelected>>', self.switch_language)
+        ttk.Label(main, text=t(SUBTITLE)).grid(sticky='w', pady=(0, 10))
 
         # source
-        box = ttk.LabelFrame(main, text='Game disc (drive, .cue or .iso)', padding=8)
+        box = ttk.LabelFrame(main, text=t('Game disc (drive, .cue or .iso)'), padding=8)
         box.grid(sticky='ew', pady=4)
         box.columnconfigure(0, weight=1)
-        drives = cd_drives()
-        self.source = tk.StringVar(value=source or (drives[0] if drives else ''))
-        ttk.Combobox(box, textvariable=self.source, values=drives, width=50).grid(
+        ttk.Combobox(box, textvariable=self.source, values=self.drives, width=50).grid(
             row=0, column=0, sticky='ew')
-        ttk.Button(box, text='Browse...', command=self.pick_image).grid(
+        ttk.Button(box, text=t('Browse...'), command=self.pick_image).grid(
             row=0, column=1, padx=(6, 0))
 
         # destination
-        box = ttk.LabelFrame(main, text='Install to', padding=8)
+        box = ttk.LabelFrame(main, text=t('Install to'), padding=8)
         box.grid(sticky='ew', pady=4)
         box.columnconfigure(0, weight=1)
-        self.out = tk.StringVar(value=DEFAULT_OUT)
         ttk.Entry(box, textvariable=self.out, width=52).grid(row=0, column=0, sticky='ew')
-        ttk.Button(box, text='Browse...', command=self.pick_folder).grid(
+        ttk.Button(box, text=t('Browse...'), command=self.pick_folder).grid(
             row=0, column=1, padx=(6, 0))
 
         # music
-        box = ttk.LabelFrame(main, text='Music', padding=8)
+        box = ttk.LabelFrame(main, text=t('Music'), padding=8)
         box.grid(sticky='ew', pady=4)
-        self.music = tk.StringVar(value='cd')
         for col, (key, label, lines) in enumerate(inst.MUSIC_CHOICES):
             box.columnconfigure(col, weight=1, uniform='music')
-            ttk.Radiobutton(box, text=label, value=key, variable=self.music).grid(
+            ttk.Radiobutton(box, text=t(label), value=key, variable=self.music).grid(
                 row=0, column=col, sticky='w')
             # each line is one point; a point that doesn't fit wraps indented
-            text = '\n'.join(lines)
+            text = '\n'.join(t(line) for line in lines)
             ttk.Label(box, text=text, justify='left', wraplength=300).grid(
                 row=1, column=col, sticky='nw', padx=(24, 8))
 
         # options
-        box = ttk.LabelFrame(main, text='Options', padding=8)
+        box = ttk.LabelFrame(main, text=t('Options'), padding=8)
         box.grid(sticky='ew', pady=4)
-        self.japanese = tk.BooleanVar(value=False)
-        lang = ttk.Frame(box)
-        lang.grid(sticky='w')
-        ttk.Label(lang, text='Menus and in-game text:').grid(row=0, column=0)
-        ttk.Radiobutton(lang, text='English', value=False, variable=self.japanese).grid(
+        row = ttk.Frame(box)
+        row.grid(sticky='w')
+        ttk.Label(row, text=t('Menus and in-game text:')).grid(row=0, column=0)
+        ttk.Radiobutton(row, text=t('English'), value=False, variable=self.japanese).grid(
             row=0, column=1, padx=6)
-        ttk.Radiobutton(lang, text='Original Japanese (日本語)', value=True,
+        ttk.Radiobutton(row, text=t('Original Japanese (日本語)'), value=True,
                         variable=self.japanese).grid(row=0, column=2)
-        self.portable = tk.BooleanVar(value=True)
         ttk.Checkbutton(box, variable=self.portable,
-                        text='Portable: save settings in the game folder (MCHASE.INI), '
-                             'not the registry').grid(sticky='w', pady=(6, 0))
-        self.arrows = tk.BooleanVar(value=True)
+                        text=t('Portable: save settings in the game folder (MCHASE.INI), '
+                               'not the registry')).grid(sticky='w', pady=(6, 0))
         ttk.Checkbutton(box, variable=self.arrows,
-                        text='Move with the arrow keys (untick for the original '
-                             'numpad 8/2/4/6)').grid(sticky='w')
-        self.ddraw = tk.BooleanVar(value=True)
+                        text=t('Move with the arrow keys (untick for the original '
+                               'numpad 8/2/4/6)')).grid(sticky='w')
         ttk.Checkbutton(box, variable=self.ddraw,
-                        text='cnc-ddraw: scaled fullscreen, Alt+Enter for a window '
-                             '(2.7 MB)').grid(sticky='w')
+                        text=t('cnc-ddraw: scaled fullscreen, Alt+Enter for a window '
+                               '(2.7 MB)')).grid(sticky='w')
 
         # install + progress
         row = ttk.Frame(main)
@@ -129,10 +159,10 @@ class App:
         row.columnconfigure(0, weight=1)
         self.bar = ttk.Progressbar(row, maximum=STEPS)
         self.bar.grid(row=0, column=0, sticky='ew')
-        self.open_btn = ttk.Button(row, text='Open folder', command=self.open_folder,
-                                   state='disabled')
+        self.open_btn = ttk.Button(row, text=t('Open folder'), command=self.open_folder,
+                                   state='normal' if self.out_dir else 'disabled')
         self.open_btn.grid(row=0, column=1, padx=(6, 0))
-        self.go = ttk.Button(row, text='Install', command=self.start)
+        self.go = ttk.Button(row, text=t('Install'), command=self.start)
         self.go.grid(row=0, column=2, padx=(6, 0))
         self.status = ttk.Label(main, text='')
         self.status.grid(sticky='w')
@@ -142,13 +172,13 @@ class App:
     # ---- pickers
     def pick_image(self):
         path = filedialog.askopenfilename(
-            title='Magical Chase disc image',
-            filetypes=[('Disc images', '*.cue *.CUE *.iso *.ISO'), ('All files', '*')])
+            title=t('Magical Chase disc image'),
+            filetypes=[(t('Disc images'), '*.cue *.CUE *.iso *.ISO'), (t('All files'), '*')])
         if path:
             self.source.set(path)
 
     def pick_folder(self):
-        path = filedialog.askdirectory(title='Install Magical Chase to', mustexist=False)
+        path = filedialog.askdirectory(title=t('Install Magical Chase to'), mustexist=False)
         if path:
             self.out.set(os.path.normpath(path))
 
@@ -162,19 +192,20 @@ class App:
     def start(self):
         src, out = self.source.get().strip(), self.out.get().strip()
         if not src or not out:
-            messagebox.showwarning(TITLE, 'Choose the game disc and an install folder.')
+            messagebox.showwarning(TITLE, t('Choose the game disc and an install folder.'))
             return
         if (self.portable.get() and os.name == 'nt' and
                 'program files' in os.path.abspath(out).lower()):
             if not messagebox.askyesno(
-                    TITLE, 'Portable settings need a folder the game can write to, and '
-                           'Program Files usually is not.\n\nInstall there anyway?'):
+                    TITLE, t('Portable settings need a folder the game can write to, '
+                             'and Program Files usually is not.\n\nInstall there anyway?')):
                 return
         self.out_dir = out
         self.done_steps = 0
         self.bar['value'] = 0
         self.bar['maximum'] = STEPS + self.ddraw.get()
         self.go['state'] = self.open_btn['state'] = 'disabled'
+        self.lang_box['state'] = 'disabled'     # rebuilding would lose the progress
         self.log['state'] = 'normal'
         self.log.delete('1.0', 'end')
         self.log['state'] = 'disabled'
@@ -210,17 +241,18 @@ class App:
                 self.write(text)
             else:
                 self.go['state'] = 'normal'
+                self.lang_box['state'] = 'readonly'
                 if kind == 'done':
                     self.bar['value'] = self.bar['maximum']
                     self.open_btn['state'] = 'normal'
                     exe = os.path.join(self.out_dir, 'Mchase.exe')
                     run = exe if os.name == 'nt' else os.path.join(
                         self.out_dir, 'magical-chase.sh')
-                    self.write('Installed. Start the game with %s' % run)
-                    messagebox.showinfo(TITLE, 'Magical Chase is installed.\n\n'
-                                               'Start it with:\n%s' % run)
+                    self.write(t('Installed. Start the game with %s') % run)
+                    messagebox.showinfo(TITLE, t('Magical Chase is installed.\n\n'
+                                                 'Start it with:\n%s') % run)
                 else:
-                    self.write('Error: ' + text)
+                    self.write(t('Error: ') + text)
                     messagebox.showerror(TITLE, text)
                 return
         self.root.after(100, self.poll)
@@ -248,10 +280,10 @@ def main():
         root = tk.Tk()
     except tk.TclError as e:
         if getattr(sys, 'frozen', False) and has_console and sys.stdin.isatty():
-            print('Cannot open a window (%s), so asking here instead.\n' % e)
+            print(t('Cannot open a window (%s), so asking here instead.\n') % e)
             sys.argv[1:] = ['--ask'] + positional
             return inst.main()
-        print('Cannot open a window (%s). Use the command line installer instead.' % e)
+        print(t('Cannot open a window (%s). Use the command line installer instead.') % e)
         sys.exit(3)
     if os.name != 'nt':
         style = ttk.Style(root)
