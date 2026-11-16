@@ -82,7 +82,7 @@ python3 patcher/install_magical_chase.py <source> <output folder> [options]
 | ISO / copied disc folder | `MagicalChase.iso` (disc WAV music only) |
 
 The output folder holds the patched `Mchase.exe`, `mus/TR01–19.WAV`, the
-staff-credits viewer (`STAFF.EXE`), `magical-chase.sh` (Wine launcher; Linux installs only) and,
+staff-credits viewer (`STAFF.EXE`), the portable menu (`AUTORUN.EXE`), `magical-chase.sh` (Wine launcher; Linux installs only) and,
 unless `--no-ddraw`, cnc-ddraw (`ddraw.dll`, `ddraw.ini`, `Shaders/`,
 `cnc-ddraw config.exe`).
 
@@ -92,7 +92,30 @@ disc; it is checked by SHA-256):
 
 ## Running
 
-**Windows 10/11**: run `Mchase.exe`.
+**Windows 10/11**: run `Mchase.exe`, or `AUTORUN.EXE` for the portable menu.
+
+The installer patches the **original disc AUTORUN.EXE**, retaining its MFC
+menu, artwork, Game Start, Options and STAFF handlers. It removes the Win95
+and CD-drive restrictions, uses the game folder instead of registry installation
+records, and translates the original menu to English (`--japanese` keeps Japanese).
+The obsolete Install and Uninstall buttons are removed, and the remaining
+buttons are arranged without gaps.
+The obsolete DirectX installer DLL is no longer required. **Options** opens
+only the original settings dialog; closing it returns to the autorun without
+starting the game. The original logo is explicitly repainted when the menu
+returns from settings or another child program.
+On Linux use `./magical-chase.sh --menu` to open it.
+
+`STAFF.EXE` is also patched to find `STAFF.BMP` and `STAFF8C.BMP` beside its
+own executable, including when launched from another working directory in Wine. Its zero-size
+popup under Wine is fixed so the original credits renderer is visible.
+
+For an existing installation, reinstall to apply both executable fixes, or add
+just the original autorun with:
+`python3 patcher/patch_autorun.py MagicalChase.cue /path/to/game/AUTORUN.EXE`.
+Developer builds of the small path hooks use `python3 patcher/build_autorun.py`
+(requires keystone-engine); installation needs only the Python standard library.
+
 
 **Linux (Wine)**: `./magical-chase.sh`. `--fullscreen` for Wine's own
 fullscreen, `--window` for a plain unscaled 640×480 window, `--settings` for

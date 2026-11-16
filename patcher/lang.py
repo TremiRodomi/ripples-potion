@@ -77,6 +77,7 @@ JA = {
         'ポータブル設定にはゲームが書き込めるフォルダが必要ですが、Program Files '
         'は通常書き込めません。\n\nそれでもインストールしますか？',
     'Installed. Start the game with %s': 'インストール完了。ゲームの起動：%s',
+    'Open the launch menu with %s': '起動メニューを開く：%s',
     'Magical Chase is installed.\n\nStart it with:\n%s':
         'マジカルチェイスをインストールしました。\n\n起動するには：\n%s',
     'Error: ': 'エラー：',

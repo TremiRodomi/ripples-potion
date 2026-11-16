@@ -69,7 +69,10 @@ CAVE_CODE = bytes.fromhex(
     'ffa3f0d2900031db85c07405bb02000000c3cccccccccccccccccccca148094a0085c075'
     '15837e40027409833df0d2900000740668ee0a4200c368180b4200c3cccccccccccccccc'
     'cccccccccccccccccccccccccccccccccccccccc83f808740a83f8107405a150774600a3'
-    '4c774600c3')
+    '4c774600c3cccccccccccccccccccccc31c9e859aab1ffe90d45b1ffcccccccccccccccc'
+    'cccccccccccccccccccccccc89359c094a00833d0c094a00007408a188c34600897004c3'
+    'cccccccccccccccc'
+)
 
 # Portable settings (build_cave.py): stand-ins for the registry functions that
 # store settings in <exe folder>\MCHASE.INI instead of HKCU\Software\QUEST.
@@ -135,6 +138,12 @@ CODE_PATCHES.append((0x42E0E9, '8b0d74094a00',
                      (b'\x8b\x0d' + struct.pack('<I', SEC_VA + 0x30C)).hex()))
 CODE_PATCHES.append((0x4277E7, 'a34c774600',
                      (b'\xe8' + rel32(0x4277E7 + 5, SEC_VA + 0x1A0)).hex()))
+# AUTORUN settings mode must show only the original property sheet, not
+# initialize a hidden fullscreen game/DirectDraw window alongside it.
+CODE_PATCHES.append((0x421624, '0f85c7000000',
+                     (b'\x0f\x85' + rel32(0x421624 + 6, SEC_VA + 0x1C0)).hex()))
+CODE_PATCHES.append((0x427C12, '89359c094a00',
+                     (b'\xe8' + rel32(0x427C12 + 5, SEC_VA + 0x1E0) + b'\x90').hex()))
 CODE_PATCHES[2] = (0x420AE5, 'a148094a00',
                    (b'\xe9' + rel32(0x420AE5 + 5, SEC_VA + 0x160)).hex())
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Install Magical Chase (Windows 95) to a folder - no CD needed afterwards, no
-AUTORUN.EXE, no InstallShield - and apply patch_mchase.py.
+Install Magical Chase (Windows 95) to a folder with a portable autorun menu -
+no CD needed afterwards, no InstallShield - and apply patch_mchase.py.
 
 Usage:
     python3 install_magical_chase.py <source> <output folder> [options]
@@ -34,6 +34,7 @@ Usage:
 
 Result:
     <output>/Mchase.exe         patched game
+    <output>/AUTORUN.EXE        portable menu (English, or Japanese with --japanese)
     <output>/mus/TR01-19.WAV    music (CD quality by default)
     <output>/STAFF.EXE + BMPs   staff-credits viewer from the disc
     <output>/magical-chase.sh   Linux/Wine launcher (not written on Windows)
@@ -55,6 +56,7 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import patch_mchase  # noqa: E402
+import patch_autorun  # noqa: E402
 import lang  # noqa: E402
 from lang import t  # noqa: E402
 
@@ -437,6 +439,7 @@ LAUNCHER = r'''#!/bin/sh
 #   ./magical-chase.sh --fullscreen  real fullscreen (Wine/the desktop scales 640x480)
 #   ./magical-chase.sh --window      plain 640x480 Wine window (no scaling)
 #   ./magical-chase.sh --settings    AUTORUN's original settings screen
+#   ./magical-chase.sh --menu        portable autorun menu
 # If cnc-ddraw's ddraw.dll is in this folder, the normal start uses it, so the
 # game is scaled to whatever window/fullscreen size ddraw.ini asks for.
 # Otherwise the normal start is the same as --window.
@@ -451,10 +454,19 @@ fi
 case "$1" in
   --fullscreen) exec wine "$EXE" ;;
   --window)     exec wine explorer /desktop=MagicalChase,640x480 "$EXE" ;;
+  --menu)       exec wine "$PWD/AUTORUN.EXE" ;;
   --settings)   exec wine $VDESK "$EXE" WGOPA242_ S ;;
   *)            exec wine $VDESK "$EXE" ;;
 esac
 '''
+
+
+def menu_command(out):
+    """User-facing command for opening the installed portable menu."""
+    if os.name == 'nt':
+        return os.path.join(out, 'AUTORUN.EXE')
+    import shlex
+    return shlex.quote(os.path.join(out, 'magical-chase.sh')) + ' --menu'
 
 
 def wav_frames(disc_wav):
@@ -480,8 +492,14 @@ def install(src, out, disc_wav=False, japanese=False, arrow_keys=True,
                 raise SystemExit(t('Unexpected Mchase.exe on this disc (sha256 %s)') % h)
             blob = patch_mchase.patch(blob, japanese=japanese, arrow_keys=arrow_keys,
                                       portable=portable)
+        elif name == 'STAFF.EXE':
+            blob = patch_autorun.patch_staff(blob)
         open(os.path.join(out, name), 'wb').write(blob)
         log('   ' + name)
+
+    menu = patch_autorun.patch(source.read_file('RUN/AUTORUN.EXE'), japanese=japanese)
+    open(os.path.join(out, 'AUTORUN.EXE'), 'wb').write(menu)
+    log('   AUTORUN.EXE')
 
     audio = source.audio_tracks
     use_cd = not disc_wav and len(audio) >= 19
@@ -580,6 +598,7 @@ def ask(src=''):
             ddraw=ddraw, log=log)
     print(t('\nStart the game with "%s"') % os.path.join(
         out, 'Mchase.exe' if os.name == 'nt' else 'magical-chase.sh'))
+    print(t('Open the launch menu with %s') % menu_command(out))
 
 
 def main():
@@ -606,6 +625,7 @@ def main():
             log=log)
     print(t('Done. Windows: run Mchase.exe   Linux: run %s') %
           os.path.join(args[1], 'magical-chase.sh'))
+    print(t('Open the launch menu with %s') % menu_command(args[1]))
 
 
 if __name__ == '__main__':

@@ -20,6 +20,7 @@
 # local work folders (game files, disassembly, test output)
 /work/
 /MagicalChase/
+/new/
 __pycache__/
 *.pyc
 *.pce

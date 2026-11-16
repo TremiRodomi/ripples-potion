@@ -154,6 +154,26 @@ cave_bpp:
 bpp_store:
     mov dword ptr [0x46774c], eax
     ret
+
+@@settings_only
+; S mode: show the original property sheet without initializing the game
+; window, DirectDraw renderer or game loop; return through WinMain epilogue.
+settings_only:
+    xor ecx, ecx
+    call 0x427c20
+    jmp 0x4216d9
+
+@@settings_owner
+; Sound tests need a valid cooperative-level HWND. In standalone settings
+; use the property sheet itself, without creating a game window.
+settings_owner:
+    mov dword ptr [0x4a099c], esi
+    cmp dword ptr [0x4a090c], 0
+    je owner_done
+    mov eax, dword ptr [0x46c388]
+    mov dword ptr [eax+4], esi
+owner_done:
+    ret
 """
 
 P_GETS, P_WRITES, P_ATTR = PTR_TABLE + 20, PTR_TABLE + 24, PTR_TABLE + 28
@@ -280,7 +300,7 @@ ip_done:
 """
 ks = Ks(KS_ARCH_X86, KS_MODE_32)
 asm = "\n".join(l.split(";")[0].rstrip() for l in asm.splitlines())
-OFFS = {'cave_cmdline': 0x000, 'desktop_ok': 0x100, 'cave_mode': 0x140, 'cave_toggle': 0x160, 'cave_bpp': 0x1a0}
+OFFS = {'cave_cmdline': 0x000, 'desktop_ok': 0x100, 'cave_mode': 0x140, 'cave_toggle': 0x160, 'cave_bpp': 0x1a0, 'settings_only': 0x1c0, 'settings_owner': 0x1e0}
 parts = asm.split('@@')
 names = ['cave_cmdline'] + [p.split(chr(10))[0].strip() for p in parts[1:]]
 code = bytearray(b'\xcc' * 0x200)

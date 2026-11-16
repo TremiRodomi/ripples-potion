@@ -41,7 +41,7 @@ import install_magical_chase as inst  # noqa: E402
 
 TITLE = "Ripple's Potion"
 SUBTITLE = 'No-CD + modern Windows patch for Magical Chase (QUEST, 1998)'
-STEPS = len(inst.GAME_FILES) + 19          # files + music tracks
+STEPS = len(inst.GAME_FILES) + 1 + 19      # game files + autorun + music tracks
 DEFAULT_OUT = os.path.join(os.path.expanduser('~'), 'Games', 'MagicalChase')
 
 
@@ -249,8 +249,11 @@ class App:
                     run = exe if os.name == 'nt' else os.path.join(
                         self.out_dir, 'magical-chase.sh')
                     self.write(t('Installed. Start the game with %s') % run)
+                    menu = inst.menu_command(self.out_dir)
+                    self.write(t('Open the launch menu with %s') % menu)
                     messagebox.showinfo(TITLE, t('Magical Chase is installed.\n\n'
-                                                 'Start it with:\n%s') % run)
+                                                 'Start it with:\n%s') % run + '\n\n' +
+                                        t('Open the launch menu with %s') % menu)
                 else:
                     self.write(t('Error: ') + text)
                     messagebox.showerror(TITLE, text)
